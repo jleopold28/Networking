@@ -2,6 +2,7 @@
 import socket
 import sys
 import csv
+from rtp import *
 
 host = '0.0.0.0'
 #extract port argument
@@ -22,19 +23,15 @@ f.close()
 
 try:
 	#INITIALIZATION
-	#create a socket of UDP type
-	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	print "Socket Created"
-	#bind the socket
-	s.bind((host, port))
-	print "Socket Bind Complete"
+	s = rtp_socket()
+	rtp_bind(s, host,port)
 
 	#DATA TRANSFER
 	#receive the query and cols
 	#send the data back to the client
 	while 1:
 		#recieve the data from the client
-		data,addr = s.recvfrom(1024)
+		data,addr = rtp_recv(s)
 		if not data:
 			# if there is no data recieved, we stop listening
 			break
@@ -42,7 +39,7 @@ try:
 		query = dataList[0]
 		if query not in db.keys():
 			# if the client requests an ID that we do not have, we send the error message
-			s.sendto("Error: ID " + query + " not in the database!", addr)
+			rtp_send(s, "Error: ID " + query + " not in the database!", addr )
 			continue
 		cols = dataList[1].split(",") #cols are comma delimited
 		#initialize our response
@@ -61,16 +58,15 @@ try:
 				response = response + col + ": " + db[query][4]
 			else:
 				# if the client asks for a col that does not exist, we send the error message
-				s.sendto("Error: Client referring to a non-existing attribute - " + col, addr)
+				rtp_send(s, "Error: Client referring to a non-existing attribute - " + col, addr )
 				continue
 			if col != cols[len(cols) - 1].strip():
 				response = response + ", " #do not add a comma for the last element
-		s.sendto(response + "\n", addr) #send the response back to the server
+		rtp_send(s, response + "\n", addr)
 
 	#TERMINATION
 	#This is unreachable becuase crtl-c does not terminate the while loop, instead you must close the window
-	print "Closing connection"
-	s.close()
+	rtp_close()
 except:
 	#if we find an exception above, we print error message
 	print "Error accessing the server, please try again"
