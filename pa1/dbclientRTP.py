@@ -19,9 +19,14 @@ for i in range(3, len(sys.argv)): #iterate over the remaining arguments
 		cols = cols + sys.argv[i]
 	else:
 		cols = cols + sys.argv[i] +','
-s = rtp_socket()
-rtp_connect(s, server_host, server_port)
-rtp_close(s)
+
+#s = rtp_socket()
+s = RTPSocket()
+s.connect((server_host, server_port))
+s.close() 
+
+#s.rtp_connect(server_host, server_port)
+#s.rtp_close()
 # try:
 # 	#INITIALIZATION
 # 	s = rtp_socket()

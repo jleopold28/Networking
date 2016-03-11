@@ -20,11 +20,19 @@ for row in reader:
 #close the db.csv file
 f.close()
 
-s = rtp_socket()
-rtp_bind(s, server_host, server_port)
+s = RTPSocket()
+s.bind((server_host, server_port))
+#s.listen()
+s.accept()
+
+s.close()
+#s = rtp_socket()
+#rtp_bind(s, server_host, server_port)
 #rtp_listen(s)
-rtp_accept(s)
-rtp_close(s)
+#rtp_accept(s)
+#rtp_close(s)
+
+
 
 # try:
 # 	#INITIALIZATION
