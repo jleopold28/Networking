@@ -22,9 +22,7 @@ f.close()
 
 s = RTPSocket()
 s.bind((server_host, server_port))
-#s.listen()
 s.accept()
-
 s.close()
 #s = rtp_socket()
 #rtp_bind(s, server_host, server_port)

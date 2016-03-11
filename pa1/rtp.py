@@ -15,7 +15,6 @@ class RTPSocket:
 		self.source_port = source_address[1]
 		self.rtpsocket.bind(source_address)
 		
-
 	#connect to the desired host and port
 	def connect(self, destination_address):
 		print "Connection Request"
@@ -24,25 +23,23 @@ class RTPSocket:
 		dstport = destination_address[1]
 
 		client_isn = random.randint(0,1000);
-
-		#send packet with SYN=1 and seq=client_isn
-		#packet = self.packet("", dstport, client_isn, 0, 0, 1, 0)
-		
 		srcport = 0; #??
 		
 		header = RTPHeader(srcport, dstport, client_isn, 0, 0, 1, 0, 0, 0)
 		packet = RTPPacket(header, "")
-
+	
+		#send packet with SYN=1 and seq=client_isn
 		self.send(packet.getString(), destination_address)
+
 
 		#wait to recieve an ACK from the server
 		while 1:
 			data,addr = self.recv()
 			if data:
 				dataList = data.split(",")
-				server_acknum = dataList[2]
-				server_ack = dataList[3]
-				server_syn = dataList[4]
+				server_acknum = dataList[3]
+				server_ack = dataList[4]
+				server_syn = dataList[5]
 				print dataList
 				#only continue is the acknum = client_isn+1 and the syn and ack bit = 1
 				if server_acknum == str(client_isn + 1) and server_ack == "1" and server_syn == "1":
@@ -63,16 +60,17 @@ class RTPSocket:
 		#wait for syn bit to be recieved
 		while 1:
 			data, dstaddr = self.recv()
+			print data
 			if data:
 				dataList = data.split(",")
 				#extract the syn bit
-				syn = dataList[4]
+				syn = dataList[5]
 				if syn == "1":
 					break
 
 		print "Connection Granted"
 		#extract the client_isn for incrementing
-		client_isn = int(dataList[1])
+		client_isn = int(dataList[2])
 		dstport = dstaddr[1]
 		#generate a random server init number
 		server_isn = random.randint(0,1000);
@@ -81,6 +79,12 @@ class RTPSocket:
 		#send ACK packet with:
 		#SACK = 1, SYN = 1
 		#seq=server_isn , acknum=client_isn+1
+		header = RTPHeader(srcport, dstport, client_isn, 0, 0, 1, 0, 0, 0)
+		packet = RTPPacket(header, "")
+	
+		#send packet with SYN=1 and seq=client_isn
+		self.send(packet.getString(), destination_address)
+		
 		packet = self.packet("", dstport, server_isn, acknum, 1, 1, 0)
 		self.send(packet, dstaddr)
 
