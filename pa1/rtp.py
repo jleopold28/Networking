@@ -20,6 +20,7 @@ def rtp_listen(s):
 
 #connect to the desired host and port
 def rtp_connect(s, dsthost, dstport):
+	print "Connection Request"
 	#client side 3 way handshake
 	dstaddr = (dsthost, dstport)
 	client_isn = random.randint(0,1000);
@@ -32,7 +33,7 @@ def rtp_connect(s, dsthost, dstport):
 	while 1:
 		data,addr = rtp_recv(s)
 		if data:
-			dataList = data.split(":")
+			dataList = data.split(",")
 			server_acknum = dataList[2]
 			server_ack = dataList[3]
 			server_syn = dataList[4]
@@ -44,13 +45,12 @@ def rtp_connect(s, dsthost, dstport):
 	server_isn = int(dataList[1])
 	acknum = server_isn + 1
 
+	print "Sending ACK"
 	#send packet with SYN=0 and seq = clientisn + 1
 	#acknum is the server_isn + 1
 	packet2 = rtp_packet("", dstport, client_isn + 1, acknum, 1, 0, 0)
 	rtp_send(s, packet2, dstaddr)
 
-#returns a connection socket and addr
-#conn,addr = s.accept()
 
 #server side of 3 way handshake
 def rtp_accept(s):
@@ -58,12 +58,13 @@ def rtp_accept(s):
 	while 1:
 		data, dstaddr = rtp_recv(s)
 		if data:
-			dataList = data.split(":")
+			dataList = data.split(",")
 			#extract the syn bit
 			syn = dataList[4]
 			if syn == "1":
 				break
 
+	print "Connection Granted"
 	#extract the client_isn for incrementing
 	client_isn = int(dataList[1])
 	dstport = dstaddr[1]
@@ -79,17 +80,18 @@ def rtp_accept(s):
 
 	#wait to recieve a response from the client
 	##### MAY NEED TO TAKE THIS PART OUT
-	while 1:
-		data, dstaddr = s.recvfrom(1000)
-		if data:
-			dataList = data.split(":")
-			seqnum = dataList[1] # client_isn + 1
-			acknum = dataList[2] # server_isn + 1
-			ack = dataList[3] # 1
-			syn = dataList[4] # 0
-			#client should send us packet with the above values
-			if seqnum == str(client_isn + 1) and acknum == str(server_isn + 1) and ack == "1" and syn == "0":
-				break
+	# while 1:
+	# 	data, dstaddr = s.recvfrom(1000)
+	# 	if data:
+	# 		dataList = data.split(",")
+	# 		seqnum = dataList[1] # client_isn + 1
+	# 		acknum = dataList[2] # server_isn + 1
+	# 		ack = dataList[3] # 1
+	# 		syn = dataList[4] # 0
+	# 		#client should send us packet with the above values
+	# 		if seqnum == str(client_isn + 1) and acknum == str(server_isn + 1) and ack == "1" and syn == "0":
+	# 			break
+	# print "Finished Accept"
 
 #send data through a socket to an addr
 def rtp_send(s, data, addr):
@@ -107,7 +109,7 @@ def rtp_close(s):
 
 #make a packet with the rtp header
 def rtp_packet(data, dstport, seqnum, acknum, ACK = 0, SYN = 0, FIN = 0):
-	header = str(dstport) + ":" + str(seqnum) + ":" + str(acknum) + ":" + str(ACK) + ":" + str(SYN) + ":" + str(FIN)
+	header = str(dstport) + "," + str(seqnum) + "," + str(acknum) + "," + str(ACK) + "," + str(SYN) + "," + str(FIN)
 	packet = header + ":" + data
 	return packet
 

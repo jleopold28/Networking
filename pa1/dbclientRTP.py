@@ -19,18 +19,19 @@ for i in range(3, len(sys.argv)): #iterate over the remaining arguments
 		cols = cols + sys.argv[i]
 	else:
 		cols = cols + sys.argv[i] +','
-
 s = rtp_socket()
 rtp_connect(s, server_host, server_port)
+rtp_close(s)
 # try:
 # 	#INITIALIZATION
 # 	s = rtp_socket()
-# 	dstaddr = (server_host, server_port)
-# 	rtp_connect(s, dstaddr)
-# 	print "here"
+# 	rtp_connect(s, server_host, server_port)
+	
 # 	#DATA TRANSFER
 # 	#send our string in format ID:first_name,last_name, etc.
-# 	rtp_send(s, query + ":" + cols, (server_host,server_port))
+# 	packet = rtp_packet(query + ":" + cols, server_port, 1, 0)
+# 	rtp_send(s, packet, (server_host,server_port))
+
 # 	print "Sending Message to Server"
 # 	tries = 3
 # 	while tries > 0: #try to recieve response 3 times
@@ -54,7 +55,7 @@ rtp_connect(s, server_host, server_port)
 
 # 	#TERMINATION
 # 	#close the socket
-# 	rtp_close(s)
+# 	#rtp_close(s)
 	
 # except:
 # 	#if there is an error, print error message

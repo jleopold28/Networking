@@ -20,16 +20,19 @@ for row in reader:
 #close the db.csv file
 f.close()
 
-
 s = rtp_socket()
 rtp_bind(s, server_host, server_port)
+#rtp_listen(s)
 rtp_accept(s)
+rtp_close(s)
 
 # try:
 # 	#INITIALIZATION
 # 	s = rtp_socket()
-# 	rtp_bind(s, server_host,server_port)
+# 	rtp_bind(s, server_host, server_port)
+# 	#data, dstaddr = rtp_listen(s)
 # 	rtp_accept(s)
+# 	print "herse"
 
 # 	#rtp_listen(s)
 # 	#conn,addr = rtp_accept(s)
@@ -43,12 +46,16 @@ rtp_accept(s)
 # 			# if there is no data recieved, we stop listening
 # 			break
 # 		dataList = data.split(":") #split the query and cols by colon
-# 		query = dataList[0]
+# 		print header
+# 		print query
+# 		header = dataList[0].strip()
+# 		query = dataList[1].strip()
+
 # 		if query not in db.keys():
 # 			# if the client requests an ID that we do not have, we send the error message
 # 			rtp_send(s, "Error: ID " + query + " not in the database!", addr)
 # 			continue
-# 		cols = dataList[1].split(",") #cols are comma delimited
+# 		cols = dataList[2].split(",") #cols are comma delimited
 # 		#initialize our response
 # 		response = "From server: "
 # 		for col in cols:
@@ -73,7 +80,7 @@ rtp_accept(s)
 
 # 	#TERMINATION
 # 	#This is unreachable becuase crtl-c does not terminate the while loop, instead you must close the window
-# 	rtp_close(s)
+# 	#rtp_close(s)
 # except:
 # 	#if we find an exception above, we print error message
 # 	print "Error accessing the server, please try again"
