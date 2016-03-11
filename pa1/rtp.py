@@ -10,7 +10,7 @@ class RTPSocket:
 	def __init__(self):
 		self.rtpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		
-	#bind the socket passed in with the desired host and port
+	#bind the socket passed in with the desired host and
 	def bind(self, source_address):
 		self.source_port = source_address[1]
 		self.rtpsocket.bind(source_address)
@@ -84,7 +84,7 @@ class RTPSocket:
 	
 		#send packet with SYN=1 and seq=client_isn
 		self.send(packet.getString(), destination_address)
-		
+
 		packet = self.packet("", dstport, server_isn, acknum, 1, 1, 0)
 		self.send(packet, dstaddr)
 
