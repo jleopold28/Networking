@@ -52,8 +52,12 @@ class RTPSocket:
 		print "Sending ACK"
 		#send packet with SYN=0 and seq = clientisn + 1
 		#acknum is the server_isn + 1
-		packet2 = self.packet("", dstport, client_isn + 1, acknum, 1, 0, 0)
-		self.send(packet2, dstaddr)
+
+		header = RTPHeader(srcport, dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
+		packet = RTPPacket(header, "")
+
+		#packet2 = self.packet("", dstport, client_isn + 1, acknum, 1, 0, 0)
+		self.send(packet.getString(), destination_address)
 
 	#server side of 3 way handshake
 	def accept(self):
