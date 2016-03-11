@@ -2,6 +2,7 @@
 import sys
 import time
 from rtp import *
+import turtle
 
 #split the first arument by colon
 hostPortList = sys.argv[1].split(":")
