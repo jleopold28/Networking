@@ -1,15 +1,14 @@
-#UDP client
+#RDT client for RDBA
 import sys
-import socket
 import time
 from rtp import *
 
 #split the first arument by colon
 hostPortList = sys.argv[1].split(":")
-#extract the host
-host = hostPortList[0]
-#extract the port
-port = int(hostPortList[1])
+#extract the server_host
+server_host = hostPortList[0]
+#extract the server_port
+server_port = int(hostPortList[1])
 #extract the query (ID)
 query = sys.argv[2]
 cols = "" #string to hold the cols requested
@@ -21,39 +20,44 @@ for i in range(3, len(sys.argv)): #iterate over the remaining arguments
 	else:
 		cols = cols + sys.argv[i] +','
 
-try:
-	#INITIALIZATION
-	s = rtp_socket()
+s = rtp_socket()
+rtp_connect(s, server_host, server_port)
+# try:
+# 	#INITIALIZATION
+# 	s = rtp_socket()
+# 	dstaddr = (server_host, server_port)
+# 	rtp_connect(s, dstaddr)
+# 	print "here"
+# 	#DATA TRANSFER
+# 	#send our string in format ID:first_name,last_name, etc.
+# 	rtp_send(s, query + ":" + cols, (server_host,server_port))
+# 	print "Sending Message to Server"
+# 	tries = 3
+# 	while tries > 0: #try to recieve response 3 times
+# 		try:
+# 			print "Waiting for a response..."
+# 			rtp_settimeout(s, 2.0)
+# 			#s.settimeout(2.0) # wait 2 seconds
+# 			#receive the data from the server
+# 			data, addr = rtp_recv(s)
+# 			if data:
+# 				# if we get a response, stop the loop
+# 				break
+# 		except:
+# 			# if there is a timeout or the server is offline
+# 			print "The server has not answered in the last two seconds"
+# 			print "retrying..."
+# 			if tries == 1:
+# 				#if we are on the last try and there was no response, we set the error message
+# 				data = "There was no response from the server"
+# 		tries = tries - 1
 
-	#DATA TRANSFER
-	#send our string in format ID:first_name,last_name, etc.
-	rtp_send(s, query + ":" + cols, (host,port))
-	print "Sending Message to Server"
-	tries = 3
-	while tries > 0: #try to recieve response 3 times
-		try:
-			print "Waiting for a response..."
-			s.settimeout(2.0) # wait 2 seconds
-			#receive the data from the server
-			data, addr = rtp_recv(s)
-			if data:
-				# if we get a response, stop the loop
-				break
-		except:
-			# if there is a timeout or the server is offline
-			print "The server has not answered in the last two seconds"
-			print "retrying..."
-			if tries == 1:
-				#if we are on the last try and there was no response, we set the error message
-				data = "There was no response from the server"
-		tries = tries - 1
-
-	#TERMINATION
-	#close the socket
-	rtp_close(s)
+# 	#TERMINATION
+# 	#close the socket
+# 	rtp_close(s)
 	
-except:
-	#if there is an error, print error message
-	data = "Error - Server may be offline"
+# except:
+# 	#if there is an error, print error message
+# 	data = "Error - Server may be offline"
 
-print data
+# print data
