@@ -33,24 +33,15 @@ try:
 	s.connect((server_host, server_port))
 	print s.printSocket()
 	time.sleep(2)
-	print "fsdaf"
 	
 	#DATA TRANSFER
 	#send our string in format ID:first_name,last_name, etc.
 	source_port = s.socket_port
 	seqnum = random.randint(0,1000)
 	acknum = random.randint(0,1000)
-
-	print "source port: " + str(source_port)
-	print "dest port: " + str(server_port)
-	print "seqnum: " + str(seqnum)
-	print "acknum: " + str(acknum)
-
 	header = RTPHeader(source_port, server_port, seqnum, acknum, 0, 0, 0, 0, 0)
 	packet = RTPPacket(header, query + ":" + cols)
 
-	#packet = rtp_packet(query + ":" + cols, server_port, 1, 0)
-	#rtp_send(s, packet, (server_host,server_port))
 	s.send(packet.makeBytes(), (server_host, server_port))
 
 	print "Sending Message to Server"
@@ -58,18 +49,13 @@ try:
 	while tries > 0: #try to recieve response 3 times
 		try:
 			print "Waiting for a response..."
-			s.settimeout(2)
-			#s.settimeout(2.0) # wait 2 seconds
 			#receive the data from the server
 			data, addr = s.recv()
 			if data:
-				packet = s.getPacket(data)
-				header = packet.header
-				packetData = packet.data
-				print header
-				print packetData
+				print "Received response from server"
 				# if we get a response, stop the loop
 				break
+			time.sleep(2)
 		except:
 			# if there is a timeout or the server is offline
 			print "The server has not answered in the last two seconds"
@@ -81,10 +67,10 @@ try:
 
 	#TERMINATION
 	#close the socket
-	#rtp_close(s)
 	s.close()
 except:
 	#if there is an error, print error message
 	data = "Error - Server may be offline"
 
-print data
+packet = s.getPacket(data)
+print packet.data
