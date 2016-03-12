@@ -24,7 +24,7 @@ for i in range(3, len(sys.argv)): #iterate over the remaining arguments
 #s = rtp_socket()
 s = RTPSocket()
 s.connect((server_host, server_port))
-s.close() 
+#s.close() 
 
 #s.rtp_connect(server_host, server_port)
 #s.rtp_close()
