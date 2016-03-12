@@ -3,7 +3,8 @@ import sys
 import csv
 from rtp import *
 
-server_host = '0.0.0.0'
+#server_host = '0.0.0.0'
+server_host = '127.0.0.1'
 #extract server_port argument
 server_port = int(sys.argv[1]);
 #initialize our database
@@ -23,6 +24,7 @@ f.close()
 s = RTPSocket()
 s.bind((server_host, server_port))
 s.accept()
+print s.printSocket()
 s.close()
 
 #s = rtp_socket()

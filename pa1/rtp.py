@@ -10,10 +10,13 @@ class RTPSocket:
 	#construct a new RTPSocket
 	def __init__(self):
 		self.rtpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		self.socket_host = None
+		self.socket_port = None
 		
 	#bind the socket passed in with the desired host and
 	def bind(self, source_address):
-		#self.source_port = source_address[1]
+		self.socket_host = source_address[0]
+		self.socket_port = source_address[1]
 		self.rtpsocket.bind(source_address)
 		
 	#connect to the desired host and port
@@ -22,16 +25,15 @@ class RTPSocket:
 		dsthost = destination_address[0]
 		dstport = destination_address[1]
 
-		client_isn = random.randint(0,1000);
+		client_isn = random.randint(0,1000)
 		srcport = 0; #??
 		
 		header = RTPHeader(srcport, dstport, client_isn, 0, 0, 1, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
-		print "Sending SYN packet"
+		print "Sending SYN Packet"
 		self.send(packet.makeBytes(), destination_address)
-
 
 		#wait to recieve an ACK from the server
 		while 1:
@@ -44,12 +46,15 @@ class RTPSocket:
 
 		server_isn = header.seqnum
 		acknum = server_isn + 1
+		srcport = header.dest_port
 
 		header = RTPHeader(srcport, dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 
 		print "Sending ACK"
 		self.send(packet.makeBytes(), destination_address)
+
+		self.socket_port = srcport
 
 	#server side of 3 way handshake
 	def accept(self):
@@ -65,7 +70,7 @@ class RTPSocket:
 
 		dstport = dstaddr[1]
 		#generate a random server init number
-		server_isn = random.randint(0,1000);
+		server_isn = random.randint(0,1000)
 		acknum = client_isn + 1
 		srcport = header.dest_port
 
@@ -73,7 +78,7 @@ class RTPSocket:
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
-		print "sent SYNACK"
+		print "Sent SYNACK"
 		self.send(packet.makeBytes(), dstaddr)
 
 		#wait to recieve a response from the client
@@ -84,6 +89,7 @@ class RTPSocket:
 				header = self.getPacket(data).header
 				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
+
 		print "Finished Accept"
 
 	#send data through a socket to an addr
@@ -114,6 +120,8 @@ class RTPSocket:
 		packet = RTPPacket(header, tup[10])
 		return packet
 
+	def printSocket(self):
+		return "Socket at Port: " + str(self.socket_port)
 
 class RTPPacket:
 
