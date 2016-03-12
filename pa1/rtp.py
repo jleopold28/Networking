@@ -137,16 +137,6 @@ class RTPPacket:
 		self.header = header
 		self.data = data
 
-	
-	# takes packet and unpacks into header and data
-	# returns a list [header, data] where header is a tuple and data is a string
-	def unpack(self):
-		pass 
-		# todo unpack header
-		n = struct.unpack("!H", )
-		# todo get data
-		# todo return [header, data]
-
 	# See: http://docs.python.org/2/library/struct.html
 	# packs header into bytes and adds header so the string can be sent
 	# len_data will be used when client/server receives a packet so it knows the length of the data
