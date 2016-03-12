@@ -21,12 +21,6 @@ for i in range(3, len(sys.argv)): #iterate over the remaining arguments
 	else:
 		cols = cols + sys.argv[i] +','
 
-
-#s = RTPSocket()
-#s.connect((server_host, server_port))
-#print s.printSocket()
-#s.close() 
-
 try:
 	#INITIALIZATION
 	s = RTPSocket()

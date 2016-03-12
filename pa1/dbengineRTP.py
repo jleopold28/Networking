@@ -21,12 +21,6 @@ for row in reader:
 #close the db.csv file
 f.close()
 
-#s = RTPSocket()
-#s.bind((server_host, server_port))
-#s.accept()
-#print s.printSocket()
-#s.close()
-
 try:
 	#INITIALIZATION
 	s = RTPSocket()
