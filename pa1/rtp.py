@@ -5,7 +5,6 @@ import random
 import socket
 import struct # for making packet headers into byte string
 
-
 class RTPSocket:
 
 	#construct a new RTPSocket
@@ -14,12 +13,11 @@ class RTPSocket:
 		
 	#bind the socket passed in with the desired host and
 	def bind(self, source_address):
-		self.source_port = source_address[1]
+		#self.source_port = source_address[1]
 		self.rtpsocket.bind(source_address)
 		
 	#connect to the desired host and port
 	def connect(self, destination_address):
-		print "Connection Request"
 		#client side 3 way handshake
 		dsthost = destination_address[0]
 		dstport = destination_address[1]
@@ -31,6 +29,7 @@ class RTPSocket:
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
+		print "Sending SYN packet"
 		self.send(packet.makeBytes(), destination_address)
 
 
@@ -38,68 +37,52 @@ class RTPSocket:
 		while 1:
 			data,addr = self.recv()
 			if data:
-				dataList = data.split(",")
-				server_acknum = dataList[3]
-				server_ack = dataList[4]
-				server_syn = dataList[5]
-				print dataList
-				#only continue is the acknum = client_isn+1 and the syn and ack bit = 1
-				if server_acknum == str(client_isn + 1) and server_ack == "1" and server_syn == "1":
+				print "Recieved SYNACK"
+				header = self.getPacket(data).header
+				if header.acknum == (client_isn + 1) and header.ACK == 1 and header.SYN == 1:
 					break
 
-
-		server_isn = int(dataList[1])
+		server_isn = header.seqnum
 		acknum = server_isn + 1
-
-		print "Sending ACK"
-		#send packet with SYN=0 and seq = clientisn + 1
-		#acknum is the server_isn + 1
 
 		header = RTPHeader(srcport, dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 
-		#packet2 = self.packet("", dstport, client_isn + 1, acknum, 1, 0, 0)
+		print "Sending ACK"
 		self.send(packet.makeBytes(), destination_address)
 
 	#server side of 3 way handshake
 	def accept(self):
-		#wait for syn bit to be recieved
 		while 1:
 			data, dstaddr = self.recv()
 			if data:
+				print "Received SYN Packet"
 				header = self.getPacket(data).header
 				if header.SYN == 1:
 					break
 
-		print "Connection Granted"
-		#extract the client_isn for incrementing
-		client_isn = int(dataList[2])
+		client_isn = header.seqnum
+
 		dstport = dstaddr[1]
 		#generate a random server init number
 		server_isn = random.randint(0,1000);
 		acknum = client_isn + 1
+		srcport = header.dest_port
 
-		#send ACK packet with:
-		#ACK = 1, SYN = 1
-		#seq=server_isn , acknum=client_isn+1
 		header = RTPHeader(srcport, dstport, server_isn, acknum, 1, 1, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
-		self.send(packet.makeBytes(), destination_address)
+		print "sent SYNACK"
+		self.send(packet.makeBytes(), dstaddr)
 
 		#wait to recieve a response from the client
-		##### MAY NEED TO TAKE THIS PART OUT
 		while 1:
-			data, dstaddr = s.recvfrom(1000)
+			data, dstaddr = self.recv()
 			if data:
-				dataList = data.split(",")
-				seqnum = dataList[2] # client_isn + 1
-				acknum = dataList[3] # server_isn + 1
-				ack = dataList[4] # 1
-				syn = dataList[5] # 0
-				#client should send us packet with the above values
-				if seqnum == str(client_isn + 1) and acknum == str(server_isn + 1) and ack == "1" and syn == "0":
+				print "Received ACK"
+				header = self.getPacket(data).header
+				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
 		print "Finished Accept"
 
@@ -117,7 +100,6 @@ class RTPSocket:
 	def close(self):
 		print "Closing Connection"
 		self.rtpsocket.close()
-
 
 	# takes in the byte string received and parses it
 	# returns an RTPPacket
@@ -159,9 +141,6 @@ class RTPPacket:
 	# return True if FIN
 	def isFIN(self):
 		return self.header.FIN == 1
-
-	def getData(self):
-		return self.data
 
 
 class RTPHeader:
