@@ -123,6 +123,9 @@ class RTPSocket:
 	def printSocket(self):
 		return "Socket at Port: " + str(self.socket_port)
 
+	def setTimeout(self, time):
+		self.settimeout(2)
+
 class RTPPacket:
 
 	def __init__(self, header, data=""):
