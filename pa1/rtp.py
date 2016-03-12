@@ -1,8 +1,10 @@
 #RTP Functions
-import socket
-import random
 from inspect import getmembers
 import pprint
+import random
+import socket
+import struct # for making packet headers into byte string
+
 
 class RTPSocket:
 
@@ -29,7 +31,7 @@ class RTPSocket:
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
-		self.send(packet.getString(), destination_address)
+		self.send(packet.makeBytes()), destination_address)
 
 
 		#wait to recieve an ACK from the server
@@ -53,11 +55,11 @@ class RTPSocket:
 		#send packet with SYN=0 and seq = clientisn + 1
 		#acknum is the server_isn + 1
 
-		header = RTPHeader(srcport, dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
+		header = RTPHeader(srcport, dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 
 		#packet2 = self.packet("", dstport, client_isn + 1, acknum, 1, 0, 0)
-		self.send(packet.getString(), destination_address)
+		self.send(packet.makeBytes(), destination_address)
 
 	#server side of 3 way handshake
 	def accept(self):
@@ -83,14 +85,14 @@ class RTPSocket:
 		#send ACK packet with:
 		#SACK = 1, SYN = 1
 		#seq=server_isn , acknum=client_isn+1
-		header = RTPHeader(srcport, dstport, client_isn, 0, 0, 1, 0, 0, 0)
+		header = RTPHeader(srcport, dstport, client_isn, 0, 0, 1, 0, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
-		self.send(packet.getString(), destination_address)
+		self.send(packet.makeBytes(), destination_address)
 
-		packet = self.packet("", dstport, server_isn, acknum, 1, 1, 0)
-		self.send(packet, dstaddr)
+		packet = self.packet("", dstport, server_isn, acknum, 1, 1, 0, 0, 0)
+		self.send(packet.makeBytes(), dstaddr)
 
 		#wait to recieve a response from the client
 		##### MAY NEED TO TAKE THIS PART OUT
@@ -114,6 +116,7 @@ class RTPSocket:
 	#receive data at a socket
 	def recv(self):
 		#returns data,addr
+		# TODO implement unpacking of byte string when packet is received
 		return self.rtpsocket.recvfrom(1000)
 
 	#close the socket passed in
@@ -122,6 +125,7 @@ class RTPSocket:
 		self.rtpsocket.close()
 
 	#make a packet with the rtp header
+	# do we need this now that we have the RTPPacket class?
 	def packet(self, data, dstport, seqnum, acknum, ACK = 0, SYN = 0, FIN = 0):
 		header = str(dstport) + "," + str(seqnum) + "," + str(acknum) + "," + str(ACK) + "," + str(SYN) + "," + str(FIN)
 		packet = header + ":" + data
@@ -133,8 +137,36 @@ class RTPPacket:
 		self.header = header
 		self.data = data
 
-	def getString(self):
-		return self.header.getString() + ":" + self.data
+	
+	# takes packet and unpacks into header and data
+	# returns a list [header, data] where header is a tuple and data is a string
+	def unpack(self):
+		pass 
+		# todo unpack header
+		n = struct.unpack("!H", )
+		# todo get data
+		# todo return [header, data]
+
+	# See: http://docs.python.org/2/library/struct.html
+	# packs header into bytes and adds header so the string can be sent
+	# len_data will be used when client/server receives a packet so it knows the length of the data
+	def makeBytes(self):
+		len_data = len(data)
+		packed_header = header.makeHeader(len_data)
+		return packed_header + data # bytes + string
+
+	# are these methods even useful? IDK but here they are
+	# return True if ACK
+	def isACK(self):
+		return self.header.ACK == 1
+
+	# return True if SYN
+	def isSYN(self):
+		return self.header.SYN == 1
+
+	# return True if FIN
+	def isFIN(self):
+		return self.header.FIN == 1
 
 
 class RTPHeader:
@@ -150,6 +182,7 @@ class RTPHeader:
 		self.rwnd = rwnd
 		self.checksum = checksum
 
-	def getString(self):
-		return str(self.source_port) + "," + str(self.dest_port) + "," + str(self.seqnum) + "," + str(self.acknum) + "," + str(self.ACK) + "," + str(self.SYN) + "," + str(self.FIN) + "," + str(self.rwnd) +"," + str(self.checksum)
-
+	# packs header into bytes
+	# added new len_data argument so we know the length of the data when we unpack
+	def makeHeader(self, len_data = 0):
+		return struct.pack('!HHHLLBBBHHH', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum)
