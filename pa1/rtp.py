@@ -131,6 +131,20 @@ class RTPSocket:
 		packet = header + ":" + data
 		return packet
 
+	# takes in the byte string received and parses it
+	# returns an RTPPacket
+	def getPacket(self, bytes):
+		n = struct.unpack("!H", bytes[:2]) # length of data string
+		data_size = n[0] # get number from tuple
+		unpack_fmt = '!HHHLLBBBHH' + str(data_size) + 's' # header format + s * data_size
+		tup = struct.unpack(unpack_fmt, bytes) # unpacks the packet into a tuple
+
+		# now make new RTPPacket object with info from the tuple
+		header = RTPHeader(tup[1]), tup[2], tup[3], tup[4], tup[5], tup[6], tup[7], tup[8], tup[9])
+		packet = RTPPacket(header, tup[10])
+		return packet
+
+
 class RTPPacket:
 
 	def __init__(self, header, data=""):
