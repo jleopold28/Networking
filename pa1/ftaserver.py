@@ -6,22 +6,29 @@ import time
 
 
 # download file1 from client and upload file2 to client in same RTP connection
-def get_post(file1, file2, sock, host, port):
+def get_post(file1, file2, sock, host, port, rwnd):
 	pass
 
 
 # upload file to client
-def post(file, sock, host, port):
+def post(file, sock, host, port, rwnd):
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
 	print files
+	print sock.rwnd
 	if file not in files:
-		send_file = "File not found."
+		error_msg = "File not found."
+		sock.send(error_msg, (host, port))
 	else:
-		send_file = files[file]
+		send_file = open(file, "rb") #rb to read in binary mode
 	try:
 		# send file to client
-		sock.send(send_file, (host, port))
+		msg = send_file.read(rwnd) # read a portion of the file
+		while msg:
+			sock.send(msg, (host, port))
+			msg = send_file.read(rwnd)
+		send_file.close() # close the file
+		print "sent file to client"
 	except:
 		print "Error: Unable to send file."
 
@@ -51,7 +58,7 @@ def main(argv):
 				dest_port = addr[1]
 				filename = data
 				# send error message if file does not exist
-				post(filename, sock, dest_host, dest_port)				
+				post(filename, sock, dest_host, dest_port, rwnd)				
 			else:
 				continue
 	except:

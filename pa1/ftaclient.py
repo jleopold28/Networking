@@ -17,12 +17,12 @@ def connect(host, port, rwnd):
 
 # download file1 from server and upload file2 to the server through the same RTP connection
 # use multithreading or other way to support multiple simultaneous RTP connections
-def get_post(file1, file2, sock, host, port):
+def get_post(file1, file2, sock, host, port, rwnd):
 	pass
 
 
 # download file from server
-def get(file, sock, host, port):
+def get(file, sock, host, port, rwnd):
 	# send filename to server
 	sock.send(file, (host, port))
 
@@ -33,7 +33,7 @@ def get(file, sock, host, port):
 		print "Error: File not found."
 	else:
 		print data
-		# wtf do i do with the file now
+		# todo receive the file from server and write the file
 
 
 def main(argv):
@@ -69,7 +69,7 @@ def main(argv):
 			f = cmd_list[1]
 			g = cmd_list[2]
 			try:
-				get_post(f,g, sock, host, port)
+				get_post(f,g, sock, host, port, rwnd)
 			except:
 				print "Error downloading or uploading file."
 
@@ -82,7 +82,7 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(f, sock, host, port)
+				get(f, sock, host, port, rwnd)
 			except:
 				print "Error downloading file."
 				raise # for debugging
