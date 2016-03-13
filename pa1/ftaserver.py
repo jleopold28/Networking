@@ -1,10 +1,9 @@
 # FTA Server
 from rtp import *
+import os
 import sys
 import time
 
-# global dictionary to store files. key: filename, value: file (what data type? byte string? help)
-files = {}
 
 # download file1 from client and upload file2 to client in same RTP connection
 def get_post(file1, file2, sock, host, port):
@@ -13,8 +12,13 @@ def get_post(file1, file2, sock, host, port):
 
 # upload file to client
 def post(file, sock, host, port):
-	# get file from dictionary
-	send_file = files[file]
+	# check if file exists
+	files = [f for f in os.listdir(".") if os.path.isfile(f)]
+	print files
+	if file not in files:
+		send_file = "File not found."
+	else:
+		send_file = files[file]
 	try:
 		# send file to client
 		sock.send(send_file, (host, port))
@@ -47,11 +51,7 @@ def main(argv):
 				dest_port = addr[1]
 				filename = data
 				# send error message if file does not exist
-				if filename not in files:
-					sock.send("File not found.", (dest_host, dest_port))
-				# if file exists, call post to send to client
-				else:
-					post(filename, sock, dest_host, dest_port)				
+				post(filename, sock, dest_host, dest_port)				
 			else:
 				continue
 	except:
