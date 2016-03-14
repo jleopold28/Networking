@@ -12,6 +12,7 @@ class RTPSocket:
 		self.rtpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket_host = None
 		self.socket_port = None
+		self.N = 10
 		
 	#bind the socket passed in with the desired host and
 	def bind(self, source_address):
@@ -79,6 +80,7 @@ class RTPSocket:
 	
 		#send packet with SYN=1 and seq=client_isn
 		print "Sent SYNACK"
+		#use seperate functions here
 		self.send(packet.makeBytes(), dstaddr)
 
 		#wait to recieve a response from the client
@@ -94,7 +96,69 @@ class RTPSocket:
 
 	#send data through a socket to an addr
 	def send(self, data, addr):
-		self.rtpsocket.sendto(data, addr)
+		#list to store the packets
+		dataSegments = []
+
+		#break up the data 
+		for segment in range(0, len(data), RTPPacket.MSS):
+			if segment+RTPPacket.MSS > len(data): #if we go out of bounds
+				dataSegments.append(data[segment:]) #append from segment to the end
+			else:
+				dataSegments.append(data[segment:segment+RTPPacket.MSS]) #append segment
+
+		packetList = []
+		seqnum = 1#initialize to 1
+		for d in dataSegments:
+			#create a packet
+			source_port = self.socket_port
+			dest_port = addr[1] #addr = (host,port)
+			acknum = 0
+			ACK = 0
+			SYN = 0 
+			FIN = 0 
+			rwnd = 0 
+			checksum = 0 
+			header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum)
+			packet = RTPPacket(header, d)
+			packetList.append(packet)
+			seqnum = seqnum + 1
+
+		#now we have to send the packet list (only send N)
+		base = 0 #TYBG
+		#timer
+		while len(packetList) != 0:
+			for i in range(base, self.N):#send packets base to N
+				if i == base:
+					#start timer for first unACKED packt
+				self.rtpsocket.sendto(packetList[i].makeBytes(), addr)
+
+				response, dstaddr = self.recv()
+				if response:
+					print "Received response"
+					responseHeader = self.getPacket(response).header
+					print responseHeader
+					#incerement the base
+					#mark packets as ACKED
+
+
+				#if we recieve any during that time where acknum in range (base, base + N)
+					#remove all packets from packetList where seqnum before ack number --> cumulative ACK
+			#increment base
+
+
+
+
+
+		#self.rtpsocket.sendto(data, addr)
+
+	def sendSYN(self, data):
+		#send a syn packet
+
+	def sendACK(self, data):
+		#send an ack
+
+	def sendSYNACK(self,data):
+		#send a synack
 
 	#receive data at a socket
 	def recv(self):
@@ -128,9 +192,13 @@ class RTPSocket:
 
 class RTPPacket:
 
+	MSS = 5 #5 bytes
+
 	def __init__(self, header, data=""):
 		self.header = header
 		self.data = data
+		self.isACKED = False
+		self.isSent = False
 
 	# See: http://docs.python.org/2/library/struct.html
 	# packs header into bytes and adds header so the string can be sent
