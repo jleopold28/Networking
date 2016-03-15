@@ -147,7 +147,7 @@ class RTPSocket:
 				t = threading.Timer(RTPPacket.RTT, self.timeout)
 				t.start()
 				for i in range(base, nextseqnum - 1):
-					self.rtpsocket.sendto(packetList.pop(i))
+					self.rtpsocket.sendto(packetList.pop(i), addr)
 				self.timer_ran_out = False
 
 			#check for response ACKS
@@ -206,7 +206,13 @@ class RTPSocket:
 
 	# send a SYNACK
 	def sendSYNACK(self):
-		pass
+		# make SYN packet
+		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 1, 1, 0, 0, 0) # CHANGE THIS not the right seqnum, acknum etc
+		packet = RTPPacket(header, "")
+	
+		#send packet with ACK=1 and SYN=1 and seq=0 (change this)
+		print "Sending ACK"
+		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
 	# send a FIN
 	def sendFIN(self):
