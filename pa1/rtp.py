@@ -4,6 +4,8 @@ import pprint
 import random
 import socket
 import struct # for making packet headers into byte string
+import threading 
+import time
 
 class RTPSocket:
 
@@ -128,31 +130,36 @@ class RTPSocket:
 		#now we have to send the packet list (only send N)
 		base = 0 
 		nextseqnum = 0
-		#timer
+		self.timer_ran_out = False
+		
+		t = threading.Timer(RTPPacket.RTT, self.timeout)
 		while len(packetList) != 0:
 			if(nextseqnum < base + self.N):
 				self.rtpsocket.sendto(packetList.pop(nextseqnum), addr)
 				if(base == nextseqnum):
-					start_timer
+					t = threading.Timer(RTPPacket.RTT, self.timeout)
+					t.start()
 				nextseqnum = nextseqnum + 1
 			#else: refuse data
 			#timeout
 
-			if timer runs out:
-				#start_timer
+			if self.timer_ran_out:
+				t = threading.Timer(RTPPacket.RTT, self.timeout)
+				t.start()
 				for i in range(base, nextseqnum - 1):
 					self.rtpsocket.sendto(packetList.pop(i))
+				self.timer_ran_out = False
 
 			#check for response ACKS
 			response, dstaddr = self.recv()
-
 			if response: ## and its not corrupt
 				responseHeader = self.getPacket(response).header
 				base = responseHeader.acknum + 1
 				if(base == nextseqnum):
-					#stop timer
+					t.cancel()
 				else:
-					#start_timer
+					t = threading.Timer(RTPPacket.RTT, self.timeout)
+					t.start()
 
 			# for i in range(base, self.N):#send packets base to N
 			# 	if i == base:
@@ -173,6 +180,9 @@ class RTPSocket:
 			#increment base
 
 		#self.rtpsocket.sendto(data, addr)
+	def timeout(self):
+		self.timer_ran_out = True
+
 
 	# send a SYN
 	def sendSYN(self):
