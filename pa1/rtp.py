@@ -96,18 +96,20 @@ class RTPSocket:
 
 	#send data through a socket to an addr
 	def send(self, data, addr):
-		#list to store the packets
+		#list to store the data pieces
 		dataSegments = []
 
-		#break up the data 
+		#break up the data into size MSS 
 		for segment in range(0, len(data), RTPPacket.MSS):
-			if segment+RTPPacket.MSS > len(data): #if we go out of bounds
-				dataSegments.append(data[segment:]) #append from segment to the end
+			if segment+RTPPacket.MSS > len(data): 							#if we go out of bounds:
+				dataSegments.append(data[segment:]) 						#	append from segment to the end
 			else:
-				dataSegments.append(data[segment:segment+RTPPacket.MSS]) #append segment
+				dataSegments.append(data[segment:segment+RTPPacket.MSS]) 	#	append segment
 
 		packetList = []
-		seqnum = 1#initialize to 1
+
+		seqnum = 0 #initialize to 0
+
 		for d in dataSegments:
 			#create a packet
 			source_port = self.socket_port
@@ -120,23 +122,48 @@ class RTPSocket:
 			checksum = 0 
 			header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum)
 			packet = RTPPacket(header, d)
-			packetList.append(packet)
+			packetList.append(packet.makeBytes())
 			seqnum = seqnum + 1
 
 		#now we have to send the packet list (only send N)
-		base = 0 #TYBG
+		base = 0 
+		nextseqnum = 0
 		#timer
 		while len(packetList) != 0:
-			for i in range(base, self.N):#send packets base to N
-				if i == base:
-					#start timer for first unACKED packt
-				self.rtpsocket.sendto(packetList[i].makeBytes(), addr)
+			if(nextseqnum < base + self.N):
+				self.rtpsocket.sendto(packetList.pop(nextseqnum), addr)
+				if(base == nextseqnum):
+					start_timer
+				nextseqnum = nextseqnum + 1
+			#else: refuse data
+			#timeout
 
-				response, dstaddr = self.recv()
-				if response:
-					print "Received response"
-					responseHeader = self.getPacket(response).header
-					print responseHeader
+			if timer runs out:
+				#start_timer
+				for i in range(base, nextseqnum - 1):
+					self.rtpsocket.sendto(packetList.pop(i))
+
+			#check for response ACKS
+			response, dstaddr = self.recv()
+
+			if response: ## and its not corrupt
+				responseHeader = self.getPacket(response).header
+				base = responseHeader.acknum + 1
+				if(base == nextseqnum):
+					#stop timer
+				else:
+					#start_timer
+
+			# for i in range(base, self.N):#send packets base to N
+			# 	if i == base:
+			# 		#start timer for first unACKED packt
+			# 	self.rtpsocket.sendto(packetList[i].makeBytes(), addr)
+
+			# 	response, dstaddr = self.recv()
+			# 	if response:
+			# 		print "Received response"
+			# 		responseHeader = self.getPacket(response).header
+			# 		print responseHeader
 					#incerement the base
 					#mark packets as ACKED
 
@@ -144,10 +171,6 @@ class RTPSocket:
 				#if we recieve any during that time where acknum in range (base, base + N)
 					#remove all packets from packetList where seqnum before ack number --> cumulative ACK
 			#increment base
-
-
-
-
 
 		#self.rtpsocket.sendto(data, addr)
 
