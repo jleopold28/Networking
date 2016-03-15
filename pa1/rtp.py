@@ -23,13 +23,13 @@ class RTPSocket:
 	#connect to the desired host and port
 	def connect(self, destination_address):
 		#client side 3 way handshake
-		dsthost = destination_address[0]
-		dstport = destination_address[1]
+		self.dsthost = destination_address[0]
+		self.dstport = destination_address[1]
 
 		client_isn = random.randint(0,1000)
-		srcport = 0; #??
+		srcport = self.socket_port; # Is this right?
 		
-		header = RTPHeader(srcport, dstport, client_isn, 0, 0, 1, 0, 0, 0)
+		header = RTPHeader(srcport, self.dstport, client_isn, 0, 0, 1, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
@@ -49,7 +49,7 @@ class RTPSocket:
 		acknum = server_isn + 1
 		srcport = header.dest_port
 
-		header = RTPHeader(srcport, dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
+		header = RTPHeader(srcport, self.dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 
 		print "Sending ACK"
@@ -69,13 +69,13 @@ class RTPSocket:
 
 		client_isn = header.seqnum
 
-		dstport = dstaddr[1]
+		self.dstport = dstaddr[1]
 		#generate a random server init number
 		server_isn = random.randint(0,1000)
 		acknum = client_isn + 1
 		srcport = header.dest_port
 
-		header = RTPHeader(srcport, dstport, server_isn, acknum, 1, 1, 0, 0, 0)
+		header = RTPHeader(srcport, self.dstport, server_isn, acknum, 1, 1, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
@@ -174,14 +174,39 @@ class RTPSocket:
 
 		#self.rtpsocket.sendto(data, addr)
 
-	def sendSYN(self, data):
-		#send a syn packet
+	# send a SYN
+	def sendSYN(self):
+		# make SYN packet
+		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 0, 1, 0, 0, 0)
+		packet = RTPPacket(header, "")
+	
+		#send packet with SYN=1 and seq=0 (change this)
+		print "Sending SYN Packet"
+		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
-	def sendACK(self, data):
-		#send an ack
+	# send an ACK
+	def sendACK(self):
+		# make SYN packet
+		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 1, 0, 0, 0, 0) # CHANGE THIS not the right seqnum, acknum etc
+		packet = RTPPacket(header, "")
+	
+		#send packet with FIN=1 and seq=0 (change this)
+		print "Sending ACK"
+		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
-	def sendSYNACK(self,data):
-		#send a synack
+	# send a SYNACK
+	def sendSYNACK(self):
+		pass
+
+	# send a FIN
+	def sendFIN(self):
+		# make SYN packet
+		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 0, 0, 1, 0, 0)
+		packet = RTPPacket(header, "")
+	
+		#send packet with FIN=1 and seq=0 (change this)
+		print "Sending FIN Packet"
+		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
 	#receive data at a socket
 	def recv(self):
@@ -189,8 +214,46 @@ class RTPSocket:
 		# TODO implement unpacking of byte string when packet is received
 		return self.rtpsocket.recvfrom(1000)
 
-	#close the socket passed in
+	# close the socket
+	# this will be like how TCP does it
 	def close(self):
+		# send FIN to server
+		self.sendFIN()
+		print "Sent FIN Packet"
+		
+		# wait for ACK from server
+		self.setTimeout()
+		while 1:
+			try:
+				data, addr = self.recv()
+				if data:
+					if self.getPacket(data).isACK:
+						print "Received ACK"
+						break
+
+			except error: #socket.error
+				print "Did not receive FIN packet - socket timed out." # keep waiting I guess? for now
+
+		# wait for server to close (wait for FIN)
+		self.setTimeout()
+		while 1:
+			try:
+				data, addr = self.recv()
+				if data:
+					if self.getPacket(data).isFIN:
+						print "Received FIN"
+						break
+			except error:
+				print "Did not receive ACK - socket timed out."
+
+		# send another ACK to the server... -____-
+		self.sendACK()
+		print "Received FIN from server, sent ACK"
+
+		# wait a while to make sure the ACK gets received
+		time.sleep(5) # placeholder
+
+		# finally close the connection
 		print "Closing Connection"
 		self.rtpsocket.close()
 
@@ -211,7 +274,8 @@ class RTPSocket:
 		return "Socket at Port: " + str(self.socket_port)
 
 	def setTimeout(self, time):
-		self.settimeout(2)
+		self.rtpsocket.settimeout(2)
+
 
 class RTPPacket:
 
