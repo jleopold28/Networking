@@ -12,6 +12,7 @@ def connect(host, port, rwnd):
 		return sock
 	except:
 		print('Error: Unable to connect to server.')
+		raise
 		sys.exit(1)
 		
 

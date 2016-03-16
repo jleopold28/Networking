@@ -31,7 +31,7 @@ class RTPSocket:
 		client_isn = random.randint(0,1000)
 		srcport = self.socket_port; # Is this right?
 		
-		header = RTPHeader(srcport, self.dstport, client_isn, 0, 0, 1, 0, 0, 0)
+		header = RTPHeader(srcport, self.dstport, client_isn, 0, 0, 1, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
@@ -51,7 +51,7 @@ class RTPSocket:
 		acknum = server_isn + 1
 		srcport = header.dest_port
 
-		header = RTPHeader(srcport, self.dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0)
+		header = RTPHeader(srcport, self.dstport, client_isn + 1,  acknum, 1, 0, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 
 		print "Sending ACK"
@@ -77,7 +77,7 @@ class RTPSocket:
 		acknum = client_isn + 1
 		srcport = header.dest_port
 
-		header = RTPHeader(srcport, self.dstport, server_isn, acknum, 1, 1, 0, 0, 0)
+		header = RTPHeader(srcport, self.dstport, server_isn, acknum, 1, 1, 0, 0, 0, 0)
 		packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
@@ -112,7 +112,7 @@ class RTPSocket:
 
 		seqnum = 0 #initialize to 0
 
-		for d in dataSegments:
+		for d in range(len(dataSegments)):
 			#create a packet
 			source_port = self.socket_port
 			dest_port = addr[1] #addr = (host,port)
@@ -121,35 +121,38 @@ class RTPSocket:
 			SYN = 0 
 			FIN = 0 
 			rwnd = 0 
-			checksum = 0 
-			header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum)
-			packet = RTPPacket(header, d)
+			checksum = 0
+			# if this is the last data segment, set eom = 1 in packet header
+			if d == len(dataSegments) - 1:
+				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 1)
+			else:
+				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 1)
+			packet = RTPPacket(header, dataSegments[d])
 			packetList.append(packet.makeBytes())
 			seqnum = seqnum + 1
 
 		#now we have to send the packet list (only send N)
 		base = 0 
 		nextseqnum = 0
-		self.timer_ran_out = False
-		self.timeout = 2 # arbitrary timeout of 2 seconds
+		#self.timer_ran_out = False
 		
-		t = threading.Timer(RTPPacket.RTT, self.timeout)
+		t = threading.Timer(RTPPacket.RTT, self.timeout, [base, nextseqnum])
 		while len(packetList) != 0:
 			if(nextseqnum < base + self.N):
 				self.rtpsocket.sendto(packetList.pop(nextseqnum), addr)
 				if(base == nextseqnum):
-					t = threading.Timer(RTPPacket.RTT, self.timeout)
+					t = threading.Timer(RTPPacket.RTT, self.timeout, [base, nextseqnum])
 					t.start()
 				nextseqnum = nextseqnum + 1
 			#else: refuse data
 			
 			#timer
-			if self.timer_ran_out:
-				t = threading.Timer(RTPPacket.RTT, self.timeout)
-				t.start()
-				for i in range(base, nextseqnum - 1):
-					self.rtpsocket.sendto(packetList.pop(i), addr)
-				self.timer_ran_out = False
+			# if self.timer_ran_out:
+			# 	t = threading.Timer(RTPPacket.RTT, self.timeout, [base, nextseqnum])
+			# 	t.start()
+			# 	for i in range(base, nextseqnum - 1):
+			# 		self.rtpsocket.sendto(packetList.pop(i), addr)
+			# 	self.timer_ran_out = False
 
 			#check for response ACKS
 			response, dstaddr = self.recv()
@@ -159,7 +162,7 @@ class RTPSocket:
 				if(base == nextseqnum):
 					t.cancel()
 				else:
-					t = threading.Timer(RTPPacket.RTT, self.timeout)
+					t = threading.Timer(RTPPacket.RTT, self.timeout, [base, nextseqnum])
 					t.start()
 
 			# for i in range(base, self.N):#send packets base to N
@@ -181,8 +184,13 @@ class RTPSocket:
 			#increment base
 
 		#self.rtpsocket.sendto(data, addr)
-	def timeout(self):
-		self.timer_ran_out = True
+	def timeout(self, base, nextseqnum):
+		#self.timer_ran_out = True
+		t.start()
+		for i in range(base, nextseqnum - 1):
+			self.rtpsocket.sendto(packetList.pop(i), addr)
+			#self.timer_ran_out = False
+		# instead of this just have it re-send packets
 
 
 	# send a SYN
@@ -233,13 +241,16 @@ class RTPSocket:
 		end_of_message = False # need to implement eom
 
 		while end_of_message == False:
-			# if packet with expected seqnum (in order) is received:
+			# receive a packet from sender
 			response = self.rtpsocket.recvfrom(self.N)
 			rcvpkt = response[0].getPacket()
 			rcv_address = response[1]
+			# set end_of_message = True if eom = 1 in packet header
+			if rcvpkt.header.eom == 1:
+				end_of_message = True
+			# if packet with expected seqnum (in order) is received:
 			if rcvpkt.header.seqnum == expectedseqnum:
-				# todo: if packet is the last packet: end_of_message = True; break
-				# if not last packet, extract data - add onto string
+				# extract data - add onto string
 				data_received += rcvpacket.data
 				# send an ACK for the packet and increment expectedseqnum
 				self.sendACK(rcvpkt.header.seqnum)
@@ -248,6 +259,8 @@ class RTPSocket:
 			# else: re-send ACK for most recently received in-order packet
 			else:	
 				self.sendACK(rcvpkt.header.seqnum)
+				# if end_of_message was found, set it back to False 
+				end_of_message = False
 
 		# when end of message is reached, return the data
 		return data_received, rcv_address
@@ -301,12 +314,12 @@ class RTPSocket:
 	def getPacket(self, bytes):
 		n = struct.unpack("!H", bytes[:2]) # length of data string
 		data_size = n[0] # get number from tuple
-		unpack_fmt = '!HHHLLBBBHH' + str(data_size) + 's' # header format + s * data_size
+		unpack_fmt = '!HHHLLBBBHHB' + str(data_size) + 's' # header format + s * data_size
 		tup = struct.unpack(unpack_fmt, bytes) # unpacks the packet into a tuple
 
 		# now make new RTPPacket object with info from the tuple
-		header = RTPHeader(tup[1], tup[2], tup[3], tup[4], tup[5], tup[6], tup[7], tup[8], tup[9])
-		packet = RTPPacket(header, tup[10])
+		header = RTPHeader(tup[1], tup[2], tup[3], tup[4], tup[5], tup[6], tup[7], tup[8], tup[9], tup[10])
+		packet = RTPPacket(header, tup[11])
 		return packet
 
 	def printSocket(self):
@@ -350,7 +363,7 @@ class RTPPacket:
 
 class RTPHeader:
 
-	def __init__(self, source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum):
+	def __init__(self, source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom):
 		self.source_port = source_port
 		self.dest_port = dest_port
 		self.seqnum = seqnum
@@ -360,8 +373,9 @@ class RTPHeader:
 		self.FIN = FIN
 		self.rwnd = rwnd
 		self.checksum = checksum
+		self.eom = eom # 1 if end of message, 0 otherwise
 
 	# packs header into bytes
 	# added new len_data argument so we know the length of the data when we unpack
 	def makeHeader(self, len_data = 0):
-		return struct.pack('!HHHLLBBBHH', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum)
+		return struct.pack('!HHHLLBBBHHB', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum, self.eom)
