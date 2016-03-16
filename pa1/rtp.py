@@ -131,6 +131,7 @@ class RTPSocket:
 		base = 0 
 		nextseqnum = 0
 		self.timer_ran_out = False
+		self.timeout = 2 # arbitrary timeout of 2 seconds
 		
 		t = threading.Timer(RTPPacket.RTT, self.timeout)
 		while len(packetList) != 0:
@@ -141,8 +142,8 @@ class RTPSocket:
 					t.start()
 				nextseqnum = nextseqnum + 1
 			#else: refuse data
-			#timeout
-
+			
+			#timer
 			if self.timer_ran_out:
 				t = threading.Timer(RTPPacket.RTT, self.timeout)
 				t.start()
@@ -195,18 +196,18 @@ class RTPSocket:
 		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
 	# send an ACK
-	def sendACK(self):
-		# make SYN packet
-		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 1, 0, 0, 0, 0) # CHANGE THIS not the right seqnum, acknum etc
+	def sendACK(self, seqnum):
+		# make ACK packet
+		header = RTPHeader(self.socket_port, self.dstport, seqnum, 0, 1, 0, 0, 0, 0) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
 	
-		#send packet with FIN=1 and seq=0 (change this)
+		#send packet with ACK=1 and seq=0 (change this)
 		print "Sending ACK"
 		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
 	# send a SYNACK
 	def sendSYNACK(self):
-		# make SYN packet
+		# make SYNACK packet
 		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 1, 1, 0, 0, 0) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
 	
@@ -216,7 +217,7 @@ class RTPSocket:
 
 	# send a FIN
 	def sendFIN(self):
-		# make SYN packet
+		# make FIN packet
 		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 0, 0, 1, 0, 0)
 		packet = RTPPacket(header, "")
 	
@@ -224,14 +225,36 @@ class RTPSocket:
 		print "Sending FIN Packet"
 		self.send(packet.makeBytes(), (self.dstport, self.dsthost))
 
-	#receive data at a socket
+	# receive data at a socket
+	# returns data, addr
 	def recv(self):
-		#returns data,addr
-		# TODO implement unpacking of byte string when packet is received
-		return self.rtpsocket.recvfrom(1000)
+		expectedseqnum = 0
+		data_received = "" # received data as string
+		end_of_message = False # need to implement eom
 
-	# close the socket
-	# this will be like how TCP does it
+		while end_of_message == False: # condition should be: while not end of message
+			# if packet with expected seqnum (in order) is received:
+			response = self.rtpsocket.recvfrom(self.N)
+			rcvpkt = response[0].getPacket()
+			rcv_address = response[1]
+			if rcvpkt.header.seqnum == expectedseqnum:
+				# todo: if packet is the last packet: end_of_message = True; break
+				# if not last packet, extract data - add onto string
+				data_received += rcvpacket.data
+				# send an ACK for the packet and increment expectedseqnum
+				self.sendACK(rcvpkt.header.seqnum)
+				expectedseqnum += 1
+
+			# else: re-send ACK for most recently received in-order packet
+			else:	
+				self.sendACK(rcvpkt.header.seqnum)
+
+		# when end of message is reached, return the data
+		return data_received, rcv_address
+
+		#return self.rtpsocket.recvfrom(1000) # for testing only
+
+	# close the socket - the way TCP does it
 	def close(self):
 		# send FIN to server
 		self.sendFIN()
@@ -248,7 +271,7 @@ class RTPSocket:
 						break
 
 			except error: #socket.error
-				print "Did not receive FIN packet - socket timed out." # keep waiting I guess? for now
+				print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
 
 		# wait for server to close (wait for FIN)
 		self.setTimeout()
@@ -260,14 +283,14 @@ class RTPSocket:
 						print "Received FIN"
 						break
 			except error:
-				print "Did not receive ACK - socket timed out."
+				print "Did not receive FIN - socket timed out."
 
 		# send another ACK to the server... -____-
-		self.sendACK()
+		self.sendACK(0) # using 0 as seqnum
 		print "Received FIN from server, sent ACK"
 
 		# wait a while to make sure the ACK gets received
-		time.sleep(5) # placeholder
+		time.sleep(5) # 5 is placeholder - should be 2 * MSL
 
 		# finally close the connection
 		print "Closing Connection"
