@@ -17,23 +17,25 @@ def connect(host, port, rwnd):
 
 # download file1 from server and upload file2 to the server through the same RTP connection
 # use multithreading or other way to support multiple simultaneous RTP connections
+# this is extra credit now
 def get_post(file1, file2, sock, host, port, rwnd):
 	pass
 
 
 # download file from server
-def get(file, sock, host, port, rwnd):
+def get(filename, sock, host, port, rwnd):
 	# send filename to server
-	sock.send(file, (host, port))
+	sock.send(filename, (host, port))
 
-	# todo try 3 times to receive file
 	# receive response from server
 	data, addr = sock.recv()
 	if data == "File not found.":
 		print "Error: File not found."
 	else:
-		print data
-		# todo receive the file from server and write the file
+		# write the file
+		ofile = open(filename, "wb") # open in write bytes mode
+		ofile.write(data)
+		ofile.close()
 
 
 def main(argv):

@@ -16,7 +16,7 @@ class RTPSocket:
 		self.socket_port = None
 		self.N = 10
 		
-	#bind the socket passed in with the desired host and
+	#bind the socket passed in with the desired host and port
 	def bind(self, source_address):
 		self.socket_host = source_address[0]
 		self.socket_port = source_address[1]
@@ -232,7 +232,7 @@ class RTPSocket:
 		data_received = "" # received data as string
 		end_of_message = False # need to implement eom
 
-		while end_of_message == False: # condition should be: while not end of message
+		while end_of_message == False:
 			# if packet with expected seqnum (in order) is received:
 			response = self.rtpsocket.recvfrom(self.N)
 			rcvpkt = response[0].getPacket()
