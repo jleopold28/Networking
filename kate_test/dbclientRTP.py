@@ -25,7 +25,7 @@ try:
 	#INITIALIZATION
 	s = RTPSocket()
 	s.connect((server_host, server_port))
-	print s.printSocket()
+	print s
 	time.sleep(2)
 	
 	#DATA TRANSFER

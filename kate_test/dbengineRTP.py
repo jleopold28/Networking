@@ -26,8 +26,8 @@ try:
 	s = RTPSocket()
 	s.bind((server_host, server_port))
 	s.accept()
-	print s.printSocket()
-
+	print s
+	
 	#DATA TRANSFER
 	#receive the query and cols
 	#send the data back to the client
