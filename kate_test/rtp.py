@@ -30,7 +30,7 @@ class RTPSocket:
 
 		client_isn = random.randint(0,9999)
 		#srcport = self.socket_port; # Is this right?
-		self.srcport = client_isn
+		self.srcport = random.randint(0, 9999)
 		
 		#header = RTPHeader(self.srcport, self.dstport, client_isn, 0, 0, 1, 0, 0, 0, 0)
 		#packet = RTPPacket(header, "")
@@ -38,12 +38,11 @@ class RTPSocket:
 		
 	
 		#send packet with SYN=1 and seq=client_isn
-		print "Sending SYN Packet"
+		print "Sending SYN Packet with seqnum = " + str(client_isn)
 		self.sendSYN(self.srcport, self.dstport, client_isn, destination_address)
 		#self.send(packet.makeBytes(), destination_address)
 
 		#wait to recieve a SYNACK from the server
-		print "Waiting for SYNACK"
 		while 1:
 			data,addr = self.rtpsocket.recvfrom(1000)
 			if data:
@@ -61,17 +60,16 @@ class RTPSocket:
 
 		print "Sending ACK"
 		#self.send(packet.makeBytes(), destination_address)
-		self.sendACK(self.srcport, self.dstport, server_isn, acknum, addr)
+		self.sendACK(srcport, self.dstport, client_isn + 1, acknum, addr)
 		#self.socket_port = self.srcport #?
 
 	#server side of 3 way handshake
 	def accept(self):
 		# "listen" for SYN from client
 		while 1:
-			print "waiting..."
 			data, dstaddr = self.rtpsocket.recvfrom(1000)
 			if data:
-				print "Received SYN Packet"
+				print "Received SYN"
 				header = self.getPacket(data).header
 				if header.SYN == 1:
 					break
@@ -88,9 +86,9 @@ class RTPSocket:
 		#packet = RTPPacket(header, "")
 	
 		#send packet with SYN=1 and seq=client_isn
-		print self.socket_port
-		print "^ PORT"
-		self.sendSYNACK(self.srcport, self.dstport, client_isn + 1, server_isn, dstaddr)
+		print self.srcport
+		print "Sending SYNACK with seqnum = " + str(server_isn + 1) + ", acknum = " + str(client_isn + 1)
+		self.sendSYNACK(self.srcport, self.dstport, server_isn, client_isn + 1, dstaddr)
 		print "Sent SYNACK"
 		#use seperate functions here
 		#self.send(packet.makeBytes(), dstaddr)
@@ -101,12 +99,10 @@ class RTPSocket:
 			if data:
 				
 				header = self.getPacket(data).header
-				print "Received ACK with seqnum " + str(header.seqnum) + ", acknum " + str(header.acknum)
+				print "Received ACK with seqnum = " + str(header.seqnum) + ", acknum = " + str(header.acknum)
 				print "Expected: " + str(client_isn + 1) + ", " + str(server_isn + 1)
 				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
-
-		print "Finished Accept"
 
 	#send data through a socket to an addr
 	def send(self, data, addr):
@@ -221,7 +217,7 @@ class RTPSocket:
 	# send an ACK
 	def sendACK(self, srcport, dstport, seqnum, acknum, addr):
 		# make ACK packet
-		header = RTPHeader(int(srcport), int(dstport), seqnum, acknum, 1, 0, 0, 0, 0, 1) # CHANGE THIS not the right seqnum, acknum etc
+		header = RTPHeader(srcport, dstport, seqnum, acknum, 1, 0, 0, 0, 0, 1) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
 	
 		#send packet with ACK=1 and seq=0 (change this)
@@ -241,12 +237,12 @@ class RTPSocket:
 	# send a FIN
 	def sendFIN(self):
 		# make FIN packet
-		header = RTPHeader(self.socket_port, self.dstport, 0, 0, 0, 0, 1, 0, 1)
+		header = RTPHeader(self.srcport, self.dstport, 0, 0, 0, 0, 1, 0, 0, 1)
 		packet = RTPPacket(header, "")
 	
 		#send packet with FIN=1 and seq=0 (change this)
 		print "Sending FIN Packet"
-		self.send(packet.makeBytes(), (self.dsthost, self.dstport))
+		self.rtpsocket.sendto(packet.makeBytes(), (self.dsthost, self.dstport))
 
 	# receive data at a socket
 	# returns data, addr
@@ -298,29 +294,31 @@ class RTPSocket:
 		self.setTimeout()
 		while 1:
 			try:
-				data, addr = self.recv()
+				data, addr = self.rtpsocket.recvfrom(1000)
 				if data:
 					if self.getPacket(data).isACK:
 						print "Received ACK"
 						break
 
-			except error: #socket.error
+			except socket.error: #socket.error
 				print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
+				return
 
 		# wait for server to close (wait for FIN)
 		self.setTimeout()
 		while 1:
 			try:
-				data, addr = self.recv()
+				data, addr = self.rtpsocket.recvfrom(1000)
 				if data:
 					if self.getPacket(data).isFIN:
 						print "Received FIN"
 						break
-			except error:
+			except socket.error:
 				print "Did not receive FIN - socket timed out."
+				return
 
 		# send another ACK to the server... -____-
-		self.sendACK(0) # using 0 as seqnum
+		self.sendACK(self.srcport, self.dstport, 0, 0) # using 0 as seqnum
 		print "Received FIN from server, sent ACK"
 
 		# wait a while to make sure the ACK gets received
@@ -346,7 +344,7 @@ class RTPSocket:
 	def printSocket(self):
 		return "Socket at Port: " + str(self.socket_port)
 
-	def setTimeout(self, time):
+	def setTimeout(self):
 		self.rtpsocket.settimeout(2)
 
 

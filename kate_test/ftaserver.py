@@ -50,10 +50,7 @@ def main(argv):
 	try:
 		sock = RTPSocket()
 		sock.bind((host, port))
-		print "called bind"
 		sock.accept()
-		print "called accept"
-
 
 		# wait for response from client
 		while 1:

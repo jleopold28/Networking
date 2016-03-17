@@ -60,7 +60,10 @@ def main(argv):
 			disconnect = True
 			# disconnect from the server gracefully
 			# todo send FIN to server
-			sock.close()
+			try:
+				sock.close()
+			except:
+				disconnect = False
 
 		elif "get-post" in command:
 			# arguments should be F G
