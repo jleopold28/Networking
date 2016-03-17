@@ -28,9 +28,9 @@ class RTPSocket:
 		self.dsthost = destination_address[0]
 		self.dstport = destination_address[1]
 
-		client_isn = random.randint(0,1000)
+		client_isn = random.randint(0,9999)
 		#srcport = self.socket_port; # Is this right?
-		self.srcport = random.randint(0, 9999)
+		self.srcport = client_isn
 		
 		#header = RTPHeader(self.srcport, self.dstport, client_isn, 0, 0, 1, 0, 0, 0, 0)
 		#packet = RTPPacket(header, "")
@@ -39,29 +39,29 @@ class RTPSocket:
 	
 		#send packet with SYN=1 and seq=client_isn
 		print "Sending SYN Packet"
-		self.sendSYN(self.srcport, self.dstport, 0, destination_address)
+		self.sendSYN(self.srcport, self.dstport, client_isn, destination_address)
 		#self.send(packet.makeBytes(), destination_address)
 
 		#wait to recieve a SYNACK from the server
 		print "Waiting for SYNACK"
 		while 1:
-			data,addr = self.recv()
+			data,addr = self.rtpsocket.recvfrom(1000)
 			if data:
-				print "Recieved SYNACK"
 				header = self.getPacket(data).header
-				if header.acknum == (0 + 1) and header.ACK == 1 and header.SYN == 1:
+				if header.acknum == (client_isn + 1) and header.ACK == 1 and header.SYN == 1:
+					print "Recieved SYNACK"
 					break
 
 		server_isn = header.seqnum
 		acknum = server_isn + 1
 		srcport = header.dest_port
 
-		header = RTPHeader(self.srcport, self.dstport, 0 + 1,  acknum, 1, 0, 0, 0, 0, 0)
-		packet = RTPPacket(header, "")
+		#header = RTPHeader(self.srcport, self.dstport, 0 + 1,  acknum, 1, 0, 0, 0, 0, 0)
+		#packet = RTPPacket(header, "")
 
 		print "Sending ACK"
-		self.send(packet.makeBytes(), destination_address)
-
+		#self.send(packet.makeBytes(), destination_address)
+		self.sendACK(self.srcport, self.dstport, server_isn, acknum, addr)
 		#self.socket_port = self.srcport #?
 
 	#server side of 3 way handshake
@@ -69,7 +69,7 @@ class RTPSocket:
 		# "listen" for SYN from client
 		while 1:
 			print "waiting..."
-			data, dstaddr = self.recv()
+			data, dstaddr = self.rtpsocket.recvfrom(1000)
 			if data:
 				print "Received SYN Packet"
 				header = self.getPacket(data).header
@@ -90,17 +90,19 @@ class RTPSocket:
 		#send packet with SYN=1 and seq=client_isn
 		print self.socket_port
 		print "^ PORT"
-		self.sendSYNACK(self.socket_port, self.dstport, server_isn, acknum, dstaddr)
+		self.sendSYNACK(self.srcport, self.dstport, client_isn + 1, server_isn, dstaddr)
 		print "Sent SYNACK"
 		#use seperate functions here
 		#self.send(packet.makeBytes(), dstaddr)
 
 		#wait to recieve a response from the client
 		while 1:
-			data, dstaddr = self.recv()
+			data, dstaddr = self.rtpsocket.recvfrom(1000)
 			if data:
-				print "Received ACK"
+				
 				header = self.getPacket(data).header
+				print "Received ACK with seqnum " + str(header.seqnum) + ", acknum " + str(header.acknum)
+				print "Expected: " + str(client_isn + 1) + ", " + str(server_isn + 1)
 				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
 
@@ -165,7 +167,7 @@ class RTPSocket:
 			# 	self.timer_ran_out = False
 
 			#check for response ACKS
-			response, dstaddr = self.recv()
+			response, dstaddr = self.rtpsocket.recvfrom(1000)
 			if response: ## and its not corrupt
 				responseHeader = self.getPacket(response).header
 				base = responseHeader.acknum + 1
