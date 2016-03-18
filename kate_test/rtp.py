@@ -117,17 +117,23 @@ class RTPSocket:
 				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 1)
 			else:
 				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 0)
-
 			packet = RTPPacket(header, dataSegments[d])
 			self.packetList.append(packet.makeBytes())
 			seqnum = seqnum + 1
 
+		#print self.packetList.pop(0)
+		#print self.packetList.pop(1)
+		#print self.packetList.pop(2)
+		sys.exit(1)
 		#now we have to send the packet list (only send N)
 		self.base = 0 
-		self.nextseqnum = 0	
-		while len(self.packetList) != 0:
+		self.nextseqnum = 0
+		sendLastPacket = False
+		while sendLastPacket == False:
 			if(self.nextseqnum < self.base + self.N):
-				self.rtpsocket.sendto(self.packetList.pop(self.nextseqnum), addr)
+				#if we do a pop, the index automatically changes, so just index the packet list
+				packetToSend = self.packetList[self.nextseqnum]
+				self.rtpsocket.sendto(packetToSend, addr)
 				if(self.base == self.nextseqnum):
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 					t.start()
@@ -145,6 +151,9 @@ class RTPSocket:
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 					t.start()
 
+			if self.packetList[-1].isACKED:
+				sendLastPacket = True
+
 	# receive data at a socket
 	# returns data, addr
 	def recv(self):
@@ -157,9 +166,10 @@ class RTPSocket:
 			# receive a packet from sender
 			response, rcv_address = self.rtpsocket.recvfrom(1000) # replace with rwnd
 			if response:
-				print response
 				rcvpkt = self.getPacket(response)
 				rcv_port = rcv_address[1]
+				print "Received Packet: "
+				print rcvpkt
 				
 				# if packet with expected seqnum (in order) is received:
 				if rcvpkt.header.seqnum == expectedseqnum:
@@ -171,9 +181,9 @@ class RTPSocket:
 					# send an ACK for the packet and increment expectedseqnum
 					print "sending ACK for packet in recv"
 					seqnum = rcvpkt.header.acknum
-					acknum = rcvpkt.header.seqnum + 1
+					acknum = rcvpkt.header.seqnum
 					self.sendACK(self.socket_port, rcv_port, seqnum, acknum, rcv_address)
-					expectedseqnum += 1
+					expectedseqnum = expectedseqnum + 1
 
 				# else: re-send ACK for most recently received in-order packet
 				else:	
@@ -340,8 +350,6 @@ class RTPPacket:
 	def __init__(self, header, data=""):
 		self.header = header
 		self.data = data
-		self.isACKED = False
-		self.isSent = False
 
 	# string representation of a packet
 	def __str__(self):
