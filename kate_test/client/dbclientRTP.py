@@ -2,6 +2,7 @@
 import sys
 import time
 import random
+sys.path.insert(0,'..')
 from rtp import *
 
 #split the first arument by colon
@@ -25,18 +26,19 @@ try:
 	#INITIALIZATION
 	s = RTPSocket()
 	s.connect((server_host, server_port))
+	print "FDSAFD"
 	print s
 	time.sleep(2)
 	
 	#DATA TRANSFER
 	#send our string in format ID:first_name,last_name, etc.
-	source_port = s.socket_port
-	seqnum = random.randint(0,1000)
-	acknum = random.randint(0,1000)
-	header = RTPHeader(source_port, server_port, seqnum, acknum, 0, 0, 0, 0, 0)
-	packet = RTPPacket(header, query + ":" + cols)
+	#source_port = s.socket_port
+	#seqnum = random.randint(0,1000)
+	#acknum = random.randint(0,1000)
+	#header = RTPHeader(source_port, server_port, seqnum, acknum, 0, 0, 0, 0, 0)
+	#packet = RTPPacket(header, query + ":" + cols)
 
-	s.send(packet.makeBytes(), (server_host, server_port))
+	s.send(query + ":" + cols, (server_host, server_port))
 
 	print "Sending Message to Server"
 	tries = 3

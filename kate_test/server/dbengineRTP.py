@@ -1,6 +1,7 @@
 #RDT server for RDBA
 import sys
 import csv
+sys.path.insert(0,'..')
 from rtp import *
 
 #server_host = '0.0.0.0'
@@ -27,7 +28,7 @@ try:
 	s.bind((server_host, server_port))
 	s.accept()
 	print s
-	
+
 	#DATA TRANSFER
 	#receive the query and cols
 	#send the data back to the client
