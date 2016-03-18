@@ -34,7 +34,7 @@ class RTPSocket:
 		self.socket_port = random.randint(0, 9999)
 		#oh manaaadsf
 	
-		print "Sending SYN Packet with seqnum = " + str(client_isn)
+		#print "Sending SYN Packet with seqnum = " + str(client_isn)
 		self.sendSYN(self.socket_port, self.dstport, client_isn, destination_address)
 
 		#wait to recieve a SYNACK from the server
@@ -43,7 +43,7 @@ class RTPSocket:
 			if data:
 				header = self.getPacket(data).header
 				if header.acknum == (client_isn + 1) and header.ACK == 1 and header.SYN == 1:
-					print "Recieved SYNACK"
+					#print "Recieved SYNACK"
 					break
 
 		server_isn = header.seqnum
@@ -59,7 +59,7 @@ class RTPSocket:
 		while 1:
 			data, dstaddr = self.rtpsocket.recvfrom(1000)
 			if data:
-				print "Received SYN"
+				#print "Received SYN"
 				header = self.getPacket(data).header
 				if header.SYN == 1:
 					break
@@ -73,17 +73,17 @@ class RTPSocket:
 		srcport = header.dest_port
 
 		#print self.socket_port
-		print "Sending SYNACK with seqnum = " + str(server_isn + 1) + ", acknum = " + str(client_isn + 1)
+		#print "Sending SYNACK with seqnum = " + str(server_isn + 1) + ", acknum = " + str(client_isn + 1)
 		self.sendSYNACK(self.socket_port, self.dstport, server_isn, client_isn + 1, dstaddr)
-		print "Sent SYNACK"
+		#print "Sent SYNACK"
 
 		#wait to recieve a response from the client
 		while 1:
 			data, dstaddr = self.rtpsocket.recvfrom(1000)
 			if data:
 				header = self.getPacket(data).header
-				print "Received ACK with seqnum = " + str(header.seqnum) + ", acknum = " + str(header.acknum)
-				print "Expected: " + str(client_isn + 1) + ", " + str(server_isn + 1)
+				#print "Received ACK with seqnum = " + str(header.seqnum) + ", acknum = " + str(header.acknum)
+				#print "Expected: " + str(client_isn + 1) + ", " + str(server_isn + 1)
 				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
 
@@ -156,7 +156,7 @@ class RTPSocket:
 	# receive data at a socket
 	# returns data, addr
 	def recv(self):
-		print "Calling recv"
+		#print "Calling recv"
 		expectedseqnum = 0
 		data_received = "" # received data as string
 		end_of_message = False # need to implement eom
@@ -170,9 +170,6 @@ class RTPSocket:
 				rcv_port = rcv_address[1]
 				#print "Received Packet:"
 				#print rcvpkt
-
-				if rcvpkt.header.ACK == 1 or rcvpkt.header.SYN == 1:
-					continue
 				# if packet with expected seqnum (in order) is received:
 				if rcvpkt.header.seqnum == expectedseqnum:
 					# set end_of_message = True if eom = 1 in packet header
@@ -274,17 +271,17 @@ class RTPSocket:
 		eom = 1
 
 		header = RTPHeader(self.socket_port, self.dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
-		packet = RTPPacket(header, "")
+		packet = RTPPacket(header, "CLOSE CONNECTION")
 	
 		#print packet
 		#print "Sending FIN Packet"
 		self.rtpsocket.sendto(packet.makeBytes(), (self.dsthost, self.dstport))
 
 	# close the socket - the way TCP does it
-	def close(self):
+	def clientClose(self):
 		# send FIN to server
 		self.sendFIN()
-		print "Sent FIN Packet"
+		#print "Sent FIN Packet"
 		
 		# wait for ACK from server
 		self.setTimeout()
@@ -293,7 +290,7 @@ class RTPSocket:
 				data, addr = self.rtpsocket.recvfrom(1000)
 				if data:
 					if self.getPacket(data).isACK:
-						print "Received ACK"
+						#print "Received ACK"
 						break
 
 			except socket.error: #socket.error
@@ -307,20 +304,32 @@ class RTPSocket:
 				data, addr = self.rtpsocket.recvfrom(1000)
 				if data:
 					if self.getPacket(data).isFIN:
-						print "Received FIN"
+						#print "Received FIN"
 						break
 			except socket.error:
 				print "Did not receive FIN - socket timed out."
 				return
 
 		# send another ACK to the server... -____-
-		self.sendACK(self.socket_port, self.dstport, 0, 0) # using 0 as seqnum
-		print "Received FIN from server, sent ACK"
+		dstaddr = (self.dsthost, self.dstport)
+		self.sendACK(self.socket_port, self.dstport, 0, 0, dstaddr) # using 0 as seqnum
+		#print "Received FIN from server, sent ACK"
 
 		# wait a while to make sure the ACK gets received
-		time.sleep(5) # 5 is placeholder - should be 2 * MSL
+		time.sleep(2 * RTPPacket.RTT) # 5 is placeholder - should be 2 * MSL
 
 		# finally close the connection
+		print "Closing Connection"
+		self.rtpsocket.close()
+
+	def serverClose(self):
+		#print "Sending ACK to Client"
+		#send ACK to client
+		dstaddr = (self.dsthost, self.dstport)
+		self.sendACK(self.socket_port, self.dstport, 0, 0, dstaddr)
+		#print "Sending FIN to Client"
+		#send FIN to client
+		self.sendFIN()
 		print "Closing Connection"
 		self.rtpsocket.close()
 

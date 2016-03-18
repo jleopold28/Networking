@@ -35,7 +35,9 @@ try:
 	while 1:
 		#recieve the data from the client
 		data,addr = s.recv()
-		if data:
+		if data == "CLOSE CONNECTION":
+			break
+		elif data:
 			dest_host = addr[0]
 			dest_port = addr[1]
 		else:
@@ -77,13 +79,12 @@ try:
 			continue
 		else:
 			s.send(response, (dest_host, dest_port))
-			break
+			continue
 
 	#TERMINATION
 	#This is unreachable becuase crtl-c does not terminate the while loop, instead you must close the window
-	#s.close()
-except:
+	s.serverClose()
+except Exception, e:
 	#if we find an exception above, we print error message
 	print "Error accessing the server, please try again"
-print "\nBREAK"
-s.close()
+	print e

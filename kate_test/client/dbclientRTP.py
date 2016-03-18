@@ -55,9 +55,10 @@ try:
 
 	#TERMINATION
 	#close the socket
-	#s.close()
-except:
+	s.clientClose()
+except Exception, e:
 	#if there is an error, print error message
+	print e
 	data = "Error - Server may be offline"
-print "BREAK"
+
 print data
