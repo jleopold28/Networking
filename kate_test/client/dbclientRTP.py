@@ -26,7 +26,6 @@ try:
 	#INITIALIZATION
 	s = RTPSocket()
 	s.connect((server_host, server_port))
-	print "FDSAFD"
 	print s
 	time.sleep(2)
 	
@@ -68,5 +67,6 @@ except:
 	#if there is an error, print error message
 	data = "Error - Server may be offline"
 
-packet = s.getPacket(data)
-print packet.data
+print data
+#packet = s.getPacket(data)
+#print packet.data
