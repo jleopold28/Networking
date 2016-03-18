@@ -31,7 +31,7 @@ def get(filename, sock, host, port, rwnd):
 	
 	# send filename to server
 	sock.send(filename, (host, port))
-
+	ofile = open(filename, "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()
@@ -42,11 +42,10 @@ def get(filename, sock, host, port, rwnd):
 			break
 		elif data:
 			# write the file
-			ofile = open(filename, "a") # open in write bytes mode
-			ofile.write(data)
-			ofile.close()			
+			ofile.write(data)				
 		else:
 			continue
+	ofile.close()
 
 def main(argv):
 	# arguments should be H:P W
