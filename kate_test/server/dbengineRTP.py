@@ -93,7 +93,7 @@ try:
 
 	#TERMINATION
 	#This is unreachable becuase crtl-c does not terminate the while loop, instead you must close the window
-	s.close()
+	#s.close()
 except:
 	#if we find an exception above, we print error message
 	print "Error accessing the server, please try again"

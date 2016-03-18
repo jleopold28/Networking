@@ -118,22 +118,19 @@ class RTPSocket:
 			else:
 				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 0)
 			packet = RTPPacket(header, dataSegments[d])
-			self.packetList.append(packet.makeBytes())
+			self.packetList.append(packet)
 			seqnum = seqnum + 1
-
-		#print self.packetList.pop(0)
-		#print self.packetList.pop(1)
-		#print self.packetList.pop(2)
-		#sys.exit(1)
 
 		self.base = 0 
 		self.nextseqnum = 0
-		sendLastPacket = False
-		while sendLastPacket == False:
+		ackLastPacket = False
+		while ackLastPacket == False:
 			if(self.nextseqnum < self.base + self.N):
 				#if we do a pop, the index automatically changes, so just index the packet list
 				packetToSend = self.packetList[self.nextseqnum]
-				self.rtpsocket.sendto(packetToSend, addr)
+				#print "SEND:"
+				#print packetToSend
+				self.rtpsocket.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 					t.start()
@@ -145,6 +142,8 @@ class RTPSocket:
 			if response: ## and its not corrupt
 				responseHeader = self.getPacket(response).header
 				self.base = responseHeader.acknum + 1
+				for i in range(0, self.base): #cumulative ACK
+					self.packetList[i].isACKED = True
 				if(self.base == self.nextseqnum):
 					t.cancel()
 				else:
@@ -152,7 +151,7 @@ class RTPSocket:
 					t.start()
 
 			if self.packetList[-1].isACKED:
-				sendLastPacket = True
+				ackLastPacket = True
 
 	# receive data at a socket
 	# returns data, addr
@@ -168,8 +167,8 @@ class RTPSocket:
 			if response:
 				rcvpkt = self.getPacket(response)
 				rcv_port = rcv_address[1]
-				print "Received Packet: "
-				print rcvpkt
+				#print "Received Packet: "
+				#print rcvpkt
 				
 				# if packet with expected seqnum (in order) is received:
 				if rcvpkt.header.seqnum == expectedseqnum:
@@ -179,17 +178,18 @@ class RTPSocket:
 					# extract data - add onto string
 					data_received += rcvpkt.data
 					# send an ACK for the packet and increment expectedseqnum
-					print "sending ACK for packet in recv"
+					#print "sending ACK for packet in recv"
 					seqnum = rcvpkt.header.acknum
 					acknum = rcvpkt.header.seqnum
 					self.sendACK(self.socket_port, rcv_port, seqnum, acknum, rcv_address)
 					expectedseqnum = expectedseqnum + 1
+					last_acknum_sent = acknum
 
 				# else: re-send ACK for most recently received in-order packet
 				else:	
-					print "re-sending ACK for packet in recv"
+					#print "re-sending ACK for packet in recv"
 					seqnum = rcvpkt.header.acknum
-					acknum = rcvpkt.header.seqnum
+					acknum = last_acknum_sent
 					self.sendACK(self.socket_port, rcv_port, seqnum, acknum, rcv_address)
 					# if end_of_message was found, set it back to False 
 					#end_of_message = False
@@ -222,9 +222,9 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
 		packet = RTPPacket(header, "")
-		print packet
+		#print packet
 		self.rtpsocket.sendto(packet.makeBytes(), addr)
-		print "Sent SYN"
+		#print "Sent SYN"
 
 	# send an ACK
 	def sendACK(self, srcport, dstport, seqnum, acknum, addr):
@@ -238,8 +238,8 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
-		print packet
-		print "Sending ACK"
+		#print packet
+		#print "Sending ACK"
 		self.rtpsocket.sendto(packet.makeBytes(), addr)
 
 	# send a SYNACK
@@ -256,7 +256,7 @@ class RTPSocket:
 		packet = RTPPacket(header, "")
 	
 		#print packet
-		print "Sending SYNACK"
+		#print "Sending SYNACK"
 		self.rtpsocket.sendto(packet.makeBytes(), addr)
 
 	# send a FIN
@@ -275,7 +275,7 @@ class RTPSocket:
 		packet = RTPPacket(header, "")
 	
 		#print packet
-		print "Sending FIN Packet"
+		#print "Sending FIN Packet"
 		self.rtpsocket.sendto(packet.makeBytes(), (self.dsthost, self.dstport))
 
 	# close the socket - the way TCP does it
@@ -350,6 +350,7 @@ class RTPPacket:
 	def __init__(self, header, data=""):
 		self.header = header
 		self.data = data
+		self.isACKED = False
 
 	# string representation of a packet
 	def __str__(self):

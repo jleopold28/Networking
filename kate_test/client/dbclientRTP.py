@@ -62,7 +62,7 @@ try:
 
 	#TERMINATION
 	#close the socket
-	s.close()
+	#s.close()
 except:
 	#if there is an error, print error message
 	data = "Error - Server may be offline"
