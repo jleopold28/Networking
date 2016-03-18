@@ -1,12 +1,14 @@
 # FTA Client with interactive command window
-from rtp import *
 import sys
+sys.path.insert(0,'..')
+from rtp import *
 
 # create a reliable connection with the FTA server
 # return socket
 def connect(host, port, rwnd):
 	try:
 		sock = RTPSocket()
+		sock.rwnd = rwnd
 		port = int(port)
 		sock.connect((host,port))
 		print "Connected"
@@ -26,25 +28,32 @@ def get_post(file1, file2, sock, host, port, rwnd):
 
 # download file from server
 def get(filename, sock, host, port, rwnd):
+	
 	# send filename to server
 	sock.send(filename, (host, port))
 
-	# receive response from server
-	data, addr = sock.recv()
-	if data == "File not found.":
-		print "Error: File not found."
-	else:
-		# write the file
-		ofile = open(filename, "wb") # open in write bytes mode
-		ofile.write(data)
-		ofile.close()
-
+	while 1:
+		# receive response from server
+		data, addr = sock.recv()
+		if data == "File not found.":
+			print "Error: File not found."
+			break
+		elif data == "FILE FINISHED SENDING":
+			break
+		elif data:
+			# write the file
+			ofile = open(filename, "a") # open in write bytes mode
+			ofile.write(data)
+			ofile.close()			
+		else:
+			continue
 
 def main(argv):
 	# arguments should be H:P W
 	if len(argv) != 2:
 		print "Wrong number of arguments.\npython ftaclient.py $HOST:$PORT $RWND"
 		sys.exit(1)
+
 
 	arg0 = argv[0].split(":")
 	host = arg0[0]
@@ -63,7 +72,8 @@ def main(argv):
 			try:
 				sock.close()
 			except:
-				disconnect = False
+				disconnect = True
+				#CHANGE THIS BACK 	disconnect = False
 
 		elif "get-post" in command:
 			# arguments should be F G

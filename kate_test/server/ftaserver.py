@@ -1,8 +1,9 @@
 # FTA Server
-from rtp import *
 import os
 import sys
 import time
+sys.path.insert(0,'..')
+from rtp import *
 
 
 # download file1 from client and upload file2 to client in same RTP connection
@@ -30,6 +31,7 @@ def post(filename, sock, host, port, rwnd):
 			sock.send(msg, (host, port))
 			msg = send_file.read(rwnd)
 		send_file.close() # close the file
+		sock.send("FILE FINISHED SENDING", (host, port))
 		print "sent file to client"
 	except:
 		send_file.close() # make sure file is closed
@@ -39,16 +41,17 @@ def post(filename, sock, host, port, rwnd):
 def main(argv):
 	# arguments should be port, rwnd
 	if len(argv) != 2:
-		print "Wrong number of arguments.\npython ftaclient.py $PORT $RWND"
+		print "Wrong number of arguments.\npython ftaserver.py $PORT $RWND"
 		sys.exit(1)
 
 	port = int(argv[0])
-	rwnd = argv[1]
+	rwnd = int(argv[1])
 	host = '127.0.0.1'
 
 	# create socket and bind to port
 	try:
 		sock = RTPSocket()
+		sock.rwnd = rwnd
 		sock.bind((host, port))
 		sock.accept()
 

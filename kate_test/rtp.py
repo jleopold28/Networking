@@ -16,6 +16,7 @@ class RTPSocket:
 		self.dsthost = None
 		self.dstport = None
 		self.N = 5
+		self.rwnd = None
 		
 	#bind the socket passed in with the desired host and port (SERVER)
 	def bind(self, source_address):
@@ -110,7 +111,7 @@ class RTPSocket:
 			ACK = 0
 			SYN = 0 
 			FIN = 0 
-			rwnd = 0 
+			rwnd = self.rwnd
 			checksum = 0
 			# if this is the last data segment, set eom = 1 in packet header
 			if d == len(dataSegments) - 1:
@@ -215,7 +216,7 @@ class RTPSocket:
 		ACK = 0
 		SYN = 1
 		FIN = 0
-		rwnd = 0
+		rwnd = self.rwnd
 		checksum = 0
 		eom = 1
 
@@ -231,7 +232,7 @@ class RTPSocket:
 		ACK = 1
 		SYN = 0
 		FIN = 0
-		rwnd = 0
+		rwnd = self.rwnd
 		checksum = 0
 		eom = 1
 
@@ -247,7 +248,7 @@ class RTPSocket:
 		ACK = 1
 		SYN = 1
 		FIN = 0
-		rwnd = 0
+		rwnd = self.rwnd
 		checksum = 0
 		eom = 1
 
@@ -266,7 +267,7 @@ class RTPSocket:
 		ACK = 0
 		SYN = 0
 		FIN = 1
-		rwnd = 0
+		rwnd = self.rwnd
 		checksum = 0
 		eom = 1
 
