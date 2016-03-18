@@ -38,23 +38,16 @@ try:
 		if data:
 			dest_host = addr[0]
 			dest_port = addr[1]
-			#packet = s.getPacket(data)
 		else:
 			continue
 
 		dataList = data.split(":") #split the query and cols by colon
 		query = dataList[0].strip()
-		#print dataList
 
 		if query not in db.keys():
 			# if the client requests an ID that we do not have, we send the error message
-			#seqnum = packet.header.acknum
-			#acknum = packet.header.seqnum + 1
-			#headerToSend = RTPHeader(s.socket_port, dest_port, seqnum, acknum, 0, 0, 0, 0, 0)
-			#packetToSend = RTPPacket(headerToSend, "Error: ID " + query + " not in the database!")
 			s.send("Error: ID " + query + " not in the database!", (dest_host, dest_port))
-			break
-			#continue
+			continue
 
 		cols = dataList[1].split(",") #cols are comma delimited
 		#initialize our response
@@ -73,23 +66,18 @@ try:
 				response = response + col + ": " + db[query][4]
 			else:
 				# if the client asks for a col that does not exist, we send the error message
-				#seqnum = packet.header.acknum
-				#acknum = packet.header.seqnum + 1
-				#headerToSend = RTPHeader(s.socket_port, dest_port, seqnum, acknum, 0, 0, 0, 0, 0)
-				#packetToSend = RTPPacket(headerToSend, "Error: Client referring to a non-existing attribute - " + col)
-				s.send("Error: Client referring to a non-existing attribute - " + col, (dest_host, dest_port))
-				break
+				response = "Error: Client referring to a non-existing attribute - " + col
+				#s.send("Error: Client referring to a non-existing attribute - " + col, (dest_host, dest_port))
 				#continue
-
 			if col != cols[len(cols) - 1].strip():
 				response = response + ", " #do not add a comma for the last element
 
-		#seqnum = packet.header.acknum
-		#acknum = packet.header.seqnum + 1
-		#headerToSend = RTPHeader(s.socket_port, dest_port, seqnum, acknum, 0, 0, 0, 0, 0)
-		#packetToSend = RTPPacket(headerToSend, response + "\n")
-		s.send(response + "\n", (dest_host, dest_port))
-		break
+		if response[:5] == "Error":
+			s.send(response, (dest_host, dest_port))
+			continue
+		else:
+			s.send(response, (dest_host, dest_port))
+			break
 
 	#TERMINATION
 	#This is unreachable becuase crtl-c does not terminate the while loop, instead you must close the window
@@ -97,5 +85,5 @@ try:
 except:
 	#if we find an exception above, we print error message
 	print "Error accessing the server, please try again"
-
+print "\nBREAK"
 s.close()

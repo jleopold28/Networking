@@ -164,12 +164,15 @@ class RTPSocket:
 		while end_of_message == False:
 			# receive a packet from sender
 			response, rcv_address = self.rtpsocket.recvfrom(1000) # replace with rwnd
+			last_acknum_sent = None
 			if response:
 				rcvpkt = self.getPacket(response)
 				rcv_port = rcv_address[1]
-				#print "Received Packet: "
+				#print "Received Packet:"
 				#print rcvpkt
-				
+
+				if rcvpkt.header.ACK == 1 or rcvpkt.header.SYN == 1:
+					continue
 				# if packet with expected seqnum (in order) is received:
 				if rcvpkt.header.seqnum == expectedseqnum:
 					# set end_of_message = True if eom = 1 in packet header
@@ -186,13 +189,15 @@ class RTPSocket:
 					last_acknum_sent = acknum
 
 				# else: re-send ACK for most recently received in-order packet
-				else:	
-					#print "re-sending ACK for packet in recv"
-					seqnum = rcvpkt.header.acknum
-					acknum = last_acknum_sent
-					self.sendACK(self.socket_port, rcv_port, seqnum, acknum, rcv_address)
-					# if end_of_message was found, set it back to False 
-					#end_of_message = False
+				else:
+					#only re-send the ACK after we have sent one ACK
+					if last_acknum_sent != None:
+						#print "re-sending ACK for packet in recv"
+						seqnum = rcvpkt.header.acknum
+						acknum = last_acknum_sent
+						self.sendACK(self.socket_port, rcv_port, seqnum, acknum, rcv_address)
+						# if end_of_message was found, set it back to False 
+						#end_of_message = False
 
 		# when end of message is reached, return the data
 		return data_received, rcv_address
@@ -201,13 +206,10 @@ class RTPSocket:
 
 	#timeout retransmits packets from base to nextseqnum - 1
 	def timeout(self, addr):
-		print "There was a timeout: "
-		print self.base
-		print self.nextseqnum
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
-			self.rtpsocket.sendto(self.packetList[i], addr)
+			self.rtpsocket.sendto(self.packetList[i].makeBytes(), addr)
 
 	# send a SYN
 	def sendSYN(self, srcport, dstport, seqnum, addr):

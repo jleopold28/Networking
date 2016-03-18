@@ -30,13 +30,6 @@ try:
 	time.sleep(2)
 	
 	#DATA TRANSFER
-	#send our string in format ID:first_name,last_name, etc.
-	#source_port = s.socket_port
-	#seqnum = random.randint(0,1000)
-	#acknum = random.randint(0,1000)
-	#header = RTPHeader(source_port, server_port, seqnum, acknum, 0, 0, 0, 0, 0)
-	#packet = RTPPacket(header, query + ":" + cols)
-
 	s.send(query + ":" + cols, (server_host, server_port))
 
 	print "Sending Message to Server"
@@ -66,7 +59,5 @@ try:
 except:
 	#if there is an error, print error message
 	data = "Error - Server may be offline"
-
+print "BREAK"
 print data
-#packet = s.getPacket(data)
-#print packet.data
