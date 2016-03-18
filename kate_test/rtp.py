@@ -124,8 +124,8 @@ class RTPSocket:
 		#print self.packetList.pop(0)
 		#print self.packetList.pop(1)
 		#print self.packetList.pop(2)
-		sys.exit(1)
-		#now we have to send the packet list (only send N)
+		#sys.exit(1)
+
 		self.base = 0 
 		self.nextseqnum = 0
 		sendLastPacket = False
@@ -207,7 +207,7 @@ class RTPSocket:
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
-			self.rtpsocket.sendto(self.packetList.pop(i), addr)
+			self.rtpsocket.sendto(self.packetList[i], addr)
 
 	# send a SYN
 	def sendSYN(self, srcport, dstport, seqnum, addr):
