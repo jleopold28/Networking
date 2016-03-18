@@ -1,4 +1,5 @@
 # FTA Client with interactive command window
+import os
 import sys
 sys.path.insert(0,'..')
 from rtp import *
@@ -37,6 +38,8 @@ def get(filename, sock, host, port, rwnd):
 		data, addr = sock.recv()
 		if data == "File not found.":
 			print "Error: File not found."
+			ofile.close()
+			os.remove(filename)
 			break
 		elif data == "FILE FINISHED SENDING":
 			break

@@ -22,6 +22,7 @@ def post(filename, sock, host, port, rwnd):
 	if filename not in files:
 		error_msg = "File not found."
 		sock.send(error_msg, (host, port))
+		send_file = None
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
 	try:
@@ -34,7 +35,8 @@ def post(filename, sock, host, port, rwnd):
 		sock.send("FILE FINISHED SENDING", (host, port))
 		print "sent file to client"
 	except:
-		send_file.close() # make sure file is closed
+		if send_file:
+			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
 
 
