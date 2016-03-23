@@ -1,12 +1,12 @@
-# FTA Client with interactive command window
+"""Client side of File Transfer Applciation with interactive command window."""
 import os
 import sys
-sys.path.insert(0,'..')
 from rtp import *
 
-# create a reliable connection with the FTA server
-# return socket
+sys.path.insert(0,'..')
+
 def connect(host, port, rwnd):
+	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
 	try:
 		sock = RTPSocket()
 		sock.rwnd = rwnd
@@ -20,16 +20,13 @@ def connect(host, port, rwnd):
 		sys.exit(1)
 		
 
-# download file1 from server and upload file2 to the server through the same RTP connection
-# use multithreading or other way to support multiple simultaneous RTP connections
-# this is extra credit now
 def get_post(file1, file2, sock, host, port, rwnd):
+	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	pass
 
 
-# download file from server
 def get(filename, sock, host, port, rwnd):
-	
+	"""Downloads file from server."""
 	# send filename to server
 	sock.send(filename, (host, port))
 	ofile = open(filename, "wb") # open in write bytes mode
@@ -50,7 +47,9 @@ def get(filename, sock, host, port, rwnd):
 			continue
 	ofile.close()
 
+
 def main(argv):
+	"""Main method for FTA client interactive command window."""
 	# arguments should be H:P W
 	if len(argv) != 2:
 		print "Wrong number of arguments.\npython ftaclient.py $HOST:$PORT $RWND"

@@ -1,20 +1,18 @@
-# FTA Server
+"""Server side of File Transfer Application."""
 import os
 import sys
 import time
-sys.path.insert(0,'..')
 from rtp import *
 
+sys.path.insert(0,'..')
 
-# download file1 from client and upload file2 to client in same RTP connection
-# this is extra credit now
 def get_post(file1, file2, sock, host, port, rwnd):
+	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 	pass
 
 
-# upload file to client
-# called whenever filename is received from the server
 def post(filename, sock, host, port, rwnd):
+	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
 	print files
@@ -41,6 +39,7 @@ def post(filename, sock, host, port, rwnd):
 
 
 def main(argv):
+	"""Main method to start FTA server."""
 	# arguments should be port, rwnd
 	if len(argv) != 2:
 		print "Wrong number of arguments.\npython ftaserver.py $PORT $RWND"

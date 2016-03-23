@@ -1,15 +1,18 @@
-#RTP Functions
-from inspect import getmembers
-import pprint
+"""
+This module includes RTPSocket, RTPPacket, and RTPHeader classes.
+"""
 import random
 import socket
-import struct # for making packet headers into byte string
+import struct
 import threading 
 import time
 
+
 class RTPSocket:
-	#construct a new RTPSocket
+	"""Represents a socket using RTP."""
+
 	def __init__(self):
+		"""Constructs a new RTPSocket."""
 		self.rtpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket_host = None
 		self.socket_port = None
@@ -18,22 +21,31 @@ class RTPSocket:
 		self.N = 5
 		self.rwnd = None
 		
-	#bind the socket passed in with the desired host and port (SERVER)
+
 	def bind(self, source_address):
+		"""
+		Binds the socket with the desired host and port.
+		source_address: tuple (host, port)
+		"""
 		self.socket_host = source_address[0]
 		self.socket_port = source_address[1]
 		self.rtpsocket.bind(source_address)
 		
-	#connect to the desired host and port (CLIENT)
+
 	def connect(self, destination_address):
+		"""
+		Connects to the desired host and port
+		destination_address: tuple (host, port)
+		"""
 		#client side 3 way handshake
 		self.dsthost = destination_address[0]
 		self.dstport = destination_address[1]
 
+		# client isn for 3 way handshake
 		client_isn = random.randint(0,9999)
+
 		#we dont know socket port yet, so set random number first
 		self.socket_port = random.randint(0, 9999)
-		#oh manaaadsf
 	
 		#print "Sending SYN Packet with seqnum = " + str(client_isn)
 		self.sendSYN(self.socket_port, self.dstport, client_isn, destination_address)
@@ -49,13 +61,15 @@ class RTPSocket:
 
 		server_isn = header.seqnum
 		acknum = server_isn + 1
-		#we recived a respone that gives us our own socket port
+
+		#we recived a response that gives us our own socket port
 		self.socket_port = header.dest_port
 
 		self.sendACK(self.socket_port, self.dstport, client_isn + 1, acknum, addr)
 
-	#server side of 3 way handshake
+
 	def accept(self):
+		"""Server side of 3 way handshake; accepts connection to client."""
 		# "listen" for SYN from client
 		while 1:
 			data, dstaddr = self.rtpsocket.recvfrom(1000)
@@ -88,8 +102,13 @@ class RTPSocket:
 				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
 
-	#send data through a socket to an addr
+
 	def send(self, data, addr):
+		"""
+		Sends data through a socket to an address
+		data: data to send to address
+		address: tuple (host, port)
+		"""
 		#list to store the data pieces
 		dataSegments = []
 
@@ -154,9 +173,9 @@ class RTPSocket:
 			if self.packetList[-1].isACKED:
 				ackLastPacket = True
 
-	# receive data at a socket
-	# returns data, addr
+
 	def recv(self):
+		"""Receives data at a socket and returns data, address."""
 		#print "Calling recv"
 		expectedseqnum = 0
 		data_received = "" # received data as string
@@ -202,15 +221,19 @@ class RTPSocket:
 		#return self.rtpsocket.recvfrom(1000) # for testing only
 
 
-	#timeout retransmits packets from base to nextseqnum - 1
 	def timeout(self, addr):
+		""" 
+		Retransmits packets from base to nextseqnum-1
+		addr: tuple (host, port)
+		"""
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
 			self.rtpsocket.sendto(self.packetList[i].makeBytes(), addr)
 
-	# send a SYN
+
 	def sendSYN(self, srcport, dstport, seqnum, addr):
+		"""Sends a SYN packet with srcport, dstport, seqnum to addr."""
 		# make SYN packet
 		acknum = 0
 		ACK = 0
@@ -226,8 +249,9 @@ class RTPSocket:
 		self.rtpsocket.sendto(packet.makeBytes(), addr)
 		#print "Sent SYN"
 
-	# send an ACK
+
 	def sendACK(self, srcport, dstport, seqnum, acknum, addr):
+		"""Sends an ACK packet with scrport, dstport, seqnum, acknum to addr."""
 		# make ACK packet
 		ACK = 1
 		SYN = 0
@@ -242,8 +266,9 @@ class RTPSocket:
 		#print "Sending ACK"
 		self.rtpsocket.sendto(packet.makeBytes(), addr)
 
-	# send a SYNACK
+
 	def sendSYNACK(self, srcport, dstport, seqnum, acknum, addr):
+		"""Sends a SYNACK packet with scrport, dstport, seqnum, acknum to addr"""
 		# make SYNACK packet
 		ACK = 1
 		SYN = 1
@@ -259,8 +284,9 @@ class RTPSocket:
 		#print "Sending SYNACK"
 		self.rtpsocket.sendto(packet.makeBytes(), addr)
 
-	# send a FIN
+
 	def sendFIN(self):
+		"""Sends a FIN packet to (self.dsthost, self.dstport)"""
 		# make FIN packet
 		seqnum = 0
 		acknum = 0
@@ -278,8 +304,9 @@ class RTPSocket:
 		#print "Sending FIN Packet"
 		self.rtpsocket.sendto(packet.makeBytes(), (self.dsthost, self.dstport))
 
-	# close the socket - the way TCP does it
+
 	def clientClose(self):
+		"""Closes the RTP connection from the client side."""
 		# send FIN to server
 		self.sendFIN()
 		#print "Sent FIN Packet"
@@ -323,7 +350,9 @@ class RTPSocket:
 		print "Closing Connection"
 		self.rtpsocket.close()
 
+
 	def serverClose(self):
+		"""Closes the RTP connection from the server side."""
 		#print "Sending ACK to Client"
 		#send ACK to client
 		dstaddr = (self.dsthost, self.dstport)
@@ -334,9 +363,12 @@ class RTPSocket:
 		print "Closing Connection"
 		self.rtpsocket.close()
 
-	# takes in the byte string received and parses it
-	# returns an RTPPacket
+
 	def getPacket(self, bytes):
+		"""
+		Takes in a byte string and parses it into header and data.
+		Returns an RTPPacket.
+		"""
 		n = struct.unpack("!H", bytes[:2]) # length of data string
 		data_size = n[0] # get number from tuple
 		unpack_fmt = '!HHHLLBBBHHB' + str(data_size) + 's' # header format + s * data_size
@@ -347,53 +379,70 @@ class RTPSocket:
 		packet = RTPPacket(header, tup[11])
 		return packet
 
+
 	def __str__(self):
+		"""Returns a string representation of an RTPSocket."""
 		return "Socket at Port " + str(self.socket_port) + " is sending to " + str(self.dsthost) + ":" + str(self.dstport)
 
+
 	def setTimeout(self):
+		"""Sets socket timeout to 2 seconds."""
 		self.rtpsocket.settimeout(2)
 
 
 class RTPPacket:
+	"""
+	Represents an RTP packet.
+	MSS: maximum segment size in bytes
+	RTT: round trip time in seconds
+	"""
 
 	MSS = 1 #5 bytes
 	RTT = 2 # placeholder
 
 	def __init__(self, header, data=""):
+		"""Given an RTPHeader and data (optional), constructs a new RTPPacket."""
 		self.header = header
 		self.data = data
 		self.isACKED = False
 
-	# string representation of a packet
+
 	def __str__(self):
+		"""Returns a string representation of an RTPPacket."""
 		return "Header: " + str(self.header) + ", Data: " + self.data
 
 
-	# See: http://docs.python.org/2/library/struct.html
-	# packs header into bytes and adds header so the string can be sent
-	# len_data will be used when client/server receives a packet so it knows the length of the data
 	def makeBytes(self):
+		"""
+		Returns the RTPPacket as a byte string.
+		len_data (int) will be used when client/server receives a packet so the length of the data is known.
+		See: http://docs.python.org/2/library/struct.html
+		"""
 		len_data = len(self.data)
 		packed_header = self.header.makeHeader(len_data)
 		return packed_header + self.data # bytes + string
 
-	# are these methods even useful? IDK but here they are
-	# return True if ACK
+
 	def isACK(self):
+		"""Returns True if packet is an ACK, False otherwise."""
 		return self.header.ACK == 1
 
-	# return True if SYN
+
 	def isSYN(self):
+		"""Returns True if packet is a SYN, False otherwise."""
 		return self.header.SYN == 1
 
-	# return True if FIN
+
 	def isFIN(self):
+		"""Returns True if packet is a FIN, False otherwise."""
 		return self.header.FIN == 1
 
 
 class RTPHeader:
+	"""Represents a header for an RTPPacket."""
 
 	def __init__(self, source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom):
+		"""Constructs a new RTPHeader with the fields passed in."""
 		self.source_port = source_port
 		self.dest_port = dest_port
 		self.seqnum = seqnum
@@ -405,12 +454,13 @@ class RTPHeader:
 		self.checksum = checksum
 		self.eom = eom # 1 if end of message, 0 otherwise
 
-	# string representation, allows you to see header fields if you print the header
+
 	def __str__(self):
+		"""Returns a string representation of an RTPHeader."""
 		return ("srcport: " + str(self.source_port) + ", destport: " + str(self.dest_port) + ", seqnum: " + str(self.seqnum) + ", acknum: " + str(self.acknum) + ", ACK: " + str(self.ACK) + ", SYN: "
 			+ str(self.SYN) + ", FIN: " + str(self.FIN) + ", rwnd: " + str(self.rwnd) + ", checksum: " + str(self.checksum) + ", eom: " + str(self.eom))
 
-	# packs header into bytes
-	# added new len_data argument so we know the length of the data when we unpack
+
 	def makeHeader(self, len_data = 0):
+		"""Packs header fields and returns a byte string."""
 		return struct.pack('!HHHLLBBBHHB', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum, self.eom)
