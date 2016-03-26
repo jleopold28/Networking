@@ -5,6 +5,8 @@ import threading
 sys.path.insert(0,'..')
 from rtp import *
 
+lock = threading.Lock()
+
 def connect(host, port, rwnd):
 	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
 	try:
@@ -26,13 +28,15 @@ def get_post(file1, file2, sock, host, port, rwnd):
 	sock.send(command + ":" + file1 + ":" + file2, (host,port))
 
 	#need to implement threading here
-	#download_thread = threading.Thread(target = downloadFile, args = (file1, sock, host, port, rwnd))
-	#download_thread.start()
-	#download_thread.join()
-
+	download_thread = threading.Thread(target = downloadFile, args = (file1, sock, host, port, rwnd))
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, sock, host, port, rwnd))
+	
+	download_thread.start()
 	upload_thread.start()
-	upload_thread.join()
+
+	#with lock:
+	#	download_thread.join()
+	#	upload_thread.join()
 
 	#downloadFile(file1, sock, host, port, rwnd)
 	#uploadFile(file2, sock, host, port, rwnd)
@@ -52,6 +56,7 @@ def get(filename, sock, host, port, rwnd):
 def downloadFile(filename, sock, host, port, rwnd):
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
+	print "DOWNLOADING FILE"
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()
@@ -86,6 +91,7 @@ def uploadFile(filename, sock, host, port, rwnd):
 		send_file = None
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
+	print "UPLOADING FILE"
 	try:
 		# send file to client
 		msg = send_file.read(rwnd) # read a portion of the file
@@ -100,6 +106,7 @@ def uploadFile(filename, sock, host, port, rwnd):
 			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
 		print e
+		#lock.release()
 
 def main(argv):
 	"""Main method for FTA client interactive command window."""

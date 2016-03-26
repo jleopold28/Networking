@@ -17,6 +17,7 @@ class clientThread(threading.Thread):
 		print "New thread started for "+ip+":"+str(port)
 
 	def run(self):
+		print "RUNNING THREAD for" + self.ip + ":" + str(self.port)
 		while 1:
 			data,addr = self.sock.recv()
 			if data:
@@ -39,6 +40,7 @@ class clientThread(threading.Thread):
 					error_msg = "ERROR: COMMAND NOT RECOGNIZED"
 					self.sock.send(error_msg, (dest_host, dest_port))
 			else:
+				print "C"
 				continue
 
 
@@ -46,19 +48,25 @@ def get_post(file1, file2, sock, host, port, rwnd):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 	#need to implement threading here
 
-	#upload_thread = threading.Thread(target = uploadFile, args = (file1, sock, host, port, rwnd))
-	#upload_thread.start()
-	#upload_thread.join()
+	upload_thread = threading.Thread(target = uploadFile, args = (file1, sock, host, port, rwnd))
+	download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
 
+	upload_thread.start()
+	download_thread.start()
+
+	#with lock:
+	#	upload_thread.join()
+	#	download_thread.join()
 	#download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
 	#download_thread.start()
 	#upload_thread.join()
 
 	#uploadFile(file1, sock, host, port, rwnd)
-	downloadFile(file2, sock, host, port, rwnd)
+	#downloadFile(file2, sock, host, port, rwnd)
 	#pass
 
 def get(filename, sock, host, port, rwnd):
+	print "CALLING GET"
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
@@ -76,6 +84,7 @@ def uploadFile(filename, sock, host, port, rwnd):
 		send_file = None
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
+	print "UPLOADING FILE"
 	try:
 		# send file to client
 		msg = send_file.read(rwnd) # read a portion of the file
@@ -89,10 +98,12 @@ def uploadFile(filename, sock, host, port, rwnd):
 		if send_file:
 			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
+		#lock.release()
 
 def downloadFile(filename, sock, host, port, rwnd):
 	extensionList = filename.split(".")
 	ofile = open("post_G." + extensionList[1], "wb") # open in write bytes mode
+	print "DOWNLOADING FILE"
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()
@@ -127,17 +138,21 @@ def main(argv):
 		sock.rwnd = rwnd
 		sock.bind((host, port))
 
-		#threads = []
+		#mainThread = threading.Thread()
+		#mainThread.setDaemon(True)
+
+		threads = []
 		while 1:
 			print "Waiting for incoming connections..."
 			client_addr = sock.accept()
 			newthread = clientThread(client_addr[0], client_addr[1], sock)
+			#newthread.setDaemon(True)
 			newthread.start()
-			newthread.join()
-			#threads.append(newthread)
+			#newthread.join()
+			threads.append(newthread)
 
-		#for t in threads:
-	#		t.join()
+		for t in threads:
+			t.join()
 		
 		#sock.accept()
 
