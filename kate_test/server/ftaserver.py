@@ -2,17 +2,31 @@
 import os
 import sys
 import time
+import threading
 sys.path.insert(0,'..')
 from rtp import *
 
+lock = threading.Lock()
 
 def get_post(file1, file2, sock, host, port, rwnd):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 	#need to implement threading here
-	uploadFile(file1, sock, host, port, rwnd)
-	downloadFile(file2, sock, host, port, rwnd)
-	pass
 
+	upload_thread = threading.Thread(target = uploadFile, args = (file1, sock, host, port, rwnd))
+	upload_thread.start()
+	upload_thread.join()
+
+	download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
+	download_thread.start()
+	upload_thread.join()
+	#uploadFile(file1, sock, host, port, rwnd)
+	#downloadFile(file2, sock, host, port, rwnd)
+	#pass
+
+def get(filename, sock, host, port, rwnd):
+	upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
+	upload_thread.start()
+	upload_thread.join()
 
 def uploadFile(filename, sock, host, port, rwnd):
 	"""Uploads file to client. Called whenever filename is received from server."""
@@ -89,7 +103,7 @@ def main(argv):
 				if command == "GET":
 					filename = dataList[1]
 					# send the file (or error msg) to client
-					uploadFile(filename, sock, dest_host, dest_port, rwnd)	
+					get(filename, sock, dest_host, dest_port, rwnd)	
 				elif command == "GET-POST":
 					file1 = dataList[1]
 					file2 = dataList[2]
