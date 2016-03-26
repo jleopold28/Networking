@@ -2,23 +2,26 @@
 import os
 import sys
 import time
+sys.path.insert(0,'..')
 from rtp import *
 
-sys.path.insert(0,'..')
 
 def get_post(file1, file2, sock, host, port, rwnd):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
+	#need to implement threading here
+	uploadFile(file1, sock, host, port, rwnd)
+	downloadFile(file2, sock, host, port, rwnd)
 	pass
 
 
-def post(filename, sock, host, port, rwnd):
+def uploadFile(filename, sock, host, port, rwnd):
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
 	print files
 	print sock.rwnd
 	if filename not in files:
-		error_msg = "File not found."
+		error_msg = "ERROR: FILE NOT FOUND"
 		sock.send(error_msg, (host, port))
 		send_file = None
 	else:
@@ -37,6 +40,24 @@ def post(filename, sock, host, port, rwnd):
 			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
 
+def downloadFile(filename, sock, host, port, rwnd):
+	ofile = open(filename, "wb") # open in write bytes mode
+	while 1:
+		# receive response from server
+		data, addr = sock.recv()
+		if data == "ERROR: FILE NOT FOUND":
+			ofile.close()
+			os.remove(filename)
+			print data
+			break
+		elif data == "FILE FINISHED SENDING":
+			break
+		elif data:
+			# write the file
+			ofile.write(data)				
+		else:
+			continue
+	ofile.close()
 
 def main(argv):
 	"""Main method to start FTA server."""
@@ -55,20 +76,33 @@ def main(argv):
 		sock.rwnd = rwnd
 		sock.bind((host, port))
 		sock.accept()
-
 		# wait for response from client
 		while 1:
 			data,addr = sock.recv()
 			if data:
 				dest_host = addr[0]
 				dest_port = addr[1]
-				filename = data
-				# send the file (or error msg) to client
-				post(filename, sock, dest_host, dest_port, rwnd)				
+
+				#determine which command we are doing and whith what filename
+				dataList = data.split(":")
+				command = dataList[0]
+				if command == "GET":
+					filename = dataList[1]
+					# send the file (or error msg) to client
+					uploadFile(filename, sock, dest_host, dest_port, rwnd)	
+				elif command == "GET-POST":
+					file1 = dataList[1]
+					file2 = dataList[2]
+					# send the file (or error msg) to client
+					get_post(file1, file2, sock, dest_host, dest_port, rwnd)
+				else:
+					error_msg = "ERROR: COMMAND NOT RECOGNIZED"
+					sock.send(error_msg, (host, port))
 			else:
 				continue
-	except:
+	except Exception, e:
 		print "Error"
+		print e
 		raise # for debugging
  
 

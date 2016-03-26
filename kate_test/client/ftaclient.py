@@ -1,9 +1,8 @@
 """Client side of File Transfer Applciation with interactive command window."""
 import os
 import sys
-from rtp import *
-
 sys.path.insert(0,'..')
+from rtp import *
 
 def connect(host, port, rwnd):
 	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
@@ -22,21 +21,34 @@ def connect(host, port, rwnd):
 
 def get_post(file1, file2, sock, host, port, rwnd):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
-	pass
+	command = "GET-POST"
+	sock.send(command + ":" + file1 + ":" + file2, (host,port))
 
+	#need to implement threading here
+	downloadFile(file1, sock, host, port, rwnd)
+	uploadFile(file2, sock, host, port, rwnd)
 
 def get(filename, sock, host, port, rwnd):
 	"""Downloads file from server."""
 	# send filename to server
-	sock.send(filename, (host, port))
+	command = "GET"
+	sock.send(command + ":" + filename, (host, port)) #tell the server what operation we are doing
+	downloadFile(filename, sock, host, port, rwnd)
+
+def downloadFile(filename, sock, host, port, rwnd):
 	ofile = open(filename, "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()
-		if data == "File not found.":
-			print "Error: File not found."
+		if data == "ERROR: COMMAND NOT RECOGNIZED":
 			ofile.close()
 			os.remove(filename)
+			print data
+			break
+		elif data == "ERROR: FILE NOT FOUND":
+			ofile.close()
+			os.remove(filename)
+			print data
 			break
 		elif data == "FILE FINISHED SENDING":
 			break
@@ -47,6 +59,31 @@ def get(filename, sock, host, port, rwnd):
 			continue
 	ofile.close()
 
+def uploadFile(filename, sock, host, port, rwnd):
+	"""Uploads file to server."""
+	# check if file exists
+	files = [f for f in os.listdir(".") if os.path.isfile(f)]
+	print files
+	print sock.rwnd
+	if filename not in files:
+		error_msg = "ERROR: FILE NOT FOUND"
+		sock.send(error_msg, (host, port))
+		send_file = None
+	else:
+		send_file = open(filename, "rb") #rb to read in binary mode
+	try:
+		# send file to client
+		msg = send_file.read(rwnd) # read a portion of the file
+		while msg:
+			sock.send(msg, (host, port))
+			msg = send_file.read(rwnd)
+		send_file.close() # close the file
+		sock.send("FILE FINISHED SENDING", (host, port))
+		print "sent file to client"
+	except:
+		if send_file:
+			send_file.close() # make sure file is closed
+		print "Error: Unable to send file."
 
 def main(argv):
 	"""Main method for FTA client interactive command window."""
@@ -71,7 +108,8 @@ def main(argv):
 			# disconnect from the server gracefully
 			# todo send FIN to server
 			try:
-				sock.close()
+				sock.clientClose()
+				#sock.close()
 			except:
 				disconnect = True
 				#CHANGE THIS BACK 	disconnect = False
