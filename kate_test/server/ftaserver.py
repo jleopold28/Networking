@@ -55,7 +55,8 @@ def uploadFile(filename, sock, host, port, rwnd):
 		print "Error: Unable to send file."
 
 def downloadFile(filename, sock, host, port, rwnd):
-	ofile = open(filename, "wb") # open in write bytes mode
+	extensionList = filename.split(".")
+	ofile = open("post_G." + extensionList[1], "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()

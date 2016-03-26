@@ -42,13 +42,17 @@ def get(filename, sock, host, port, rwnd):
 	# send filename to server
 	command = "GET"
 	sock.send(command + ":" + filename, (host, port)) #tell the server what operation we are doing
-	download_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
-	download_thread.start()
-	download_thread.join()
+
+	#I dont think we need to use threading here, but lets leave it becuase it works for now
+	#having the method in a thread cant hurt
+	get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
+	get_thread.start()
+	get_thread.join()
 	#downloadFile(filename, sock, host, port, rwnd)
 
 def downloadFile(filename, sock, host, port, rwnd):
-	ofile = open(filename, "wb") # open in write bytes mode
+	extensionList = filename.split(".")
+	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()
