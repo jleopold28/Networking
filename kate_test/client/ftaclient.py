@@ -26,9 +26,9 @@ def get_post(file1, file2, sock, host, port, rwnd):
 	sock.send(command + ":" + file1 + ":" + file2, (host,port))
 
 	#need to implement threading here
-	download_thread = threading.Thread(target = downloadFile, args = (file1, sock, host, port, rwnd))
-	download_thread.start()
-	download_thread.join()
+	#download_thread = threading.Thread(target = downloadFile, args = (file1, sock, host, port, rwnd))
+	#download_thread.start()
+	#download_thread.join()
 
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, sock, host, port, rwnd))
 	upload_thread.start()
@@ -42,13 +42,12 @@ def get(filename, sock, host, port, rwnd):
 	# send filename to server
 	command = "GET"
 	sock.send(command + ":" + filename, (host, port)) #tell the server what operation we are doing
-
+	downloadFile(filename, sock, host, port, rwnd)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
 	#having the method in a thread cant hurt
-	get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
-	get_thread.start()
-	get_thread.join()
-	#downloadFile(filename, sock, host, port, rwnd)
+	#get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
+	#get_thread.start()
+	#get_thread.join()
 
 def downloadFile(filename, sock, host, port, rwnd):
 	extensionList = filename.split(".")
@@ -96,10 +95,11 @@ def uploadFile(filename, sock, host, port, rwnd):
 		send_file.close() # close the file
 		sock.send("FILE FINISHED SENDING", (host, port))
 		print "sent file to client"
-	except:
+	except Exception, e:
 		if send_file:
 			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
+		print e
 
 def main(argv):
 	"""Main method for FTA client interactive command window."""

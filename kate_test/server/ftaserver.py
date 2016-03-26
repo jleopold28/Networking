@@ -8,25 +8,61 @@ from rtp import *
 
 lock = threading.Lock()
 
+class clientThread(threading.Thread):
+	def __init__(self, ip, port, sock):
+		threading.Thread.__init__(self)
+		self.ip = ip
+		self.port = port
+		self.sock = sock
+		print "New thread started for "+ip+":"+str(port)
+
+	def run(self):
+		while 1:
+			data,addr = self.sock.recv()
+			if data:
+				dest_host = addr[0]
+				dest_port = addr[1]
+
+				#determine which command we are doing and whith what filename
+				dataList = data.split(":")
+				command = dataList[0]
+				if command == "GET":
+					filename = dataList[1]
+					# send the file (or error msg) to client
+					get(filename, self.sock, dest_host, dest_port, self.sock.rwnd)	
+				elif command == "GET-POST":
+					file1 = dataList[1]
+					file2 = dataList[2]
+					# send the file (or error msg) to client
+					get_post(file1, file2, self.sock, dest_host, dest_port, self.sock.rwnd)
+				else:
+					error_msg = "ERROR: COMMAND NOT RECOGNIZED"
+					self.sock.send(error_msg, (dest_host, dest_port))
+			else:
+				continue
+
+
 def get_post(file1, file2, sock, host, port, rwnd):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 	#need to implement threading here
 
-	upload_thread = threading.Thread(target = uploadFile, args = (file1, sock, host, port, rwnd))
-	upload_thread.start()
-	upload_thread.join()
+	#upload_thread = threading.Thread(target = uploadFile, args = (file1, sock, host, port, rwnd))
+	#upload_thread.start()
+	#upload_thread.join()
 
-	download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
-	download_thread.start()
-	upload_thread.join()
+	#download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
+	#download_thread.start()
+	#upload_thread.join()
+
 	#uploadFile(file1, sock, host, port, rwnd)
-	#downloadFile(file2, sock, host, port, rwnd)
+	downloadFile(file2, sock, host, port, rwnd)
 	#pass
 
 def get(filename, sock, host, port, rwnd):
-	upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
-	upload_thread.start()
-	upload_thread.join()
+	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
+	#upload_thread.start()
+	#upload_thread.join()
+	uploadFile(filename, sock, host, port, rwnd)
 
 def uploadFile(filename, sock, host, port, rwnd):
 	"""Uploads file to client. Called whenever filename is received from server."""
@@ -90,31 +126,45 @@ def main(argv):
 		sock = RTPSocket()
 		sock.rwnd = rwnd
 		sock.bind((host, port))
-		sock.accept()
-		# wait for response from client
-		while 1:
-			data,addr = sock.recv()
-			if data:
-				dest_host = addr[0]
-				dest_port = addr[1]
 
-				#determine which command we are doing and whith what filename
-				dataList = data.split(":")
-				command = dataList[0]
-				if command == "GET":
-					filename = dataList[1]
-					# send the file (or error msg) to client
-					get(filename, sock, dest_host, dest_port, rwnd)	
-				elif command == "GET-POST":
-					file1 = dataList[1]
-					file2 = dataList[2]
-					# send the file (or error msg) to client
-					get_post(file1, file2, sock, dest_host, dest_port, rwnd)
-				else:
-					error_msg = "ERROR: COMMAND NOT RECOGNIZED"
-					sock.send(error_msg, (host, port))
-			else:
-				continue
+		#threads = []
+		while 1:
+			print "Waiting for incoming connections..."
+			client_addr = sock.accept()
+			newthread = clientThread(client_addr[0], client_addr[1], sock)
+			newthread.start()
+			newthread.join()
+			#threads.append(newthread)
+
+		#for t in threads:
+	#		t.join()
+		
+		#sock.accept()
+
+		# wait for response from client
+		# while 1:
+		# 	data,addr = sock.recv()
+		# 	if data:
+		# 		dest_host = addr[0]
+		# 		dest_port = addr[1]
+
+		# 		#determine which command we are doing and whith what filename
+		# 		dataList = data.split(":")
+		# 		command = dataList[0]
+		# 		if command == "GET":
+		# 			filename = dataList[1]
+		# 			# send the file (or error msg) to client
+		# 			get(filename, sock, dest_host, dest_port, rwnd)	
+		# 		elif command == "GET-POST":
+		# 			file1 = dataList[1]
+		# 			file2 = dataList[2]
+		# 			# send the file (or error msg) to client
+		# 			get_post(file1, file2, sock, dest_host, dest_port, rwnd)
+		# 		else:
+		# 			error_msg = "ERROR: COMMAND NOT RECOGNIZED"
+		# 			sock.send(error_msg, (host, port))
+		# 	else:
+		# 		continue
 	except Exception, e:
 		print "Error"
 		print e

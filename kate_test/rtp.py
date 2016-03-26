@@ -16,8 +16,8 @@ class RTPSocket:
 		self.rtpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.socket_host = None
 		self.socket_port = None
-		self.dsthost = None
-		self.dstport = None
+		#self.dsthost = None
+		#self.dstport = None
 		self.N = 5
 		self.rwnd = None
 		
@@ -38,8 +38,8 @@ class RTPSocket:
 		destination_address: tuple (host, port)
 		"""
 		#client side 3 way handshake
-		self.dsthost = destination_address[0]
-		self.dstport = destination_address[1]
+		#self.dsthost = destination_address[0]
+		dstport = destination_address[1]
 
 		# client isn for 3 way handshake
 		client_isn = random.randint(0,9999)
@@ -48,7 +48,7 @@ class RTPSocket:
 		self.socket_port = random.randint(0, 9999)
 	
 		#print "Sending SYN Packet with seqnum = " + str(client_isn)
-		self.sendSYN(self.socket_port, self.dstport, client_isn, destination_address)
+		self.sendSYN(self.socket_port, dstport, client_isn, destination_address)
 
 		#wait to recieve a SYNACK from the server
 		while 1:
@@ -65,7 +65,7 @@ class RTPSocket:
 		#we recived a response that gives us our own socket port
 		self.socket_port = header.dest_port
 
-		self.sendACK(self.socket_port, self.dstport, client_isn + 1, acknum, addr)
+		self.sendACK(self.socket_port, dstport, client_isn + 1, acknum, addr)
 
 
 	def accept(self):
@@ -80,8 +80,8 @@ class RTPSocket:
 					break
 
 		client_isn = header.seqnum
-		self.dsthost = dstaddr[0]
-		self.dstport = dstaddr[1]
+		#self.dsthost = dstaddr[0]
+		dstport = dstaddr[1]
 		#generate a random server init number
 		server_isn = random.randint(0,1000)
 		acknum = client_isn + 1
@@ -89,7 +89,7 @@ class RTPSocket:
 
 		#print self.socket_port
 		#print "Sending SYNACK with seqnum = " + str(server_isn + 1) + ", acknum = " + str(client_isn + 1)
-		self.sendSYNACK(self.socket_port, self.dstport, server_isn, client_isn + 1, dstaddr)
+		self.sendSYNACK(self.socket_port, dstport, server_isn, client_isn + 1, dstaddr)
 		#print "Sent SYNACK"
 
 		#wait to recieve a response from the client
@@ -102,6 +102,7 @@ class RTPSocket:
 				if header.seqnum == (client_isn + 1) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
 
+		return dstaddr
 
 	def send(self, data, addr):
 		"""
