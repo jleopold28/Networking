@@ -6,30 +6,34 @@ sys.path.insert(0,'..')
 from rtp import *
 
 lock = threading.Lock()
+sock = None
 
-def connect(host, port, rwnd):
+def connect(sock, host, port, rwnd):
 	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
 	try:
-		sock = RTPSocket()
-		sock.rwnd = rwnd
-		port = int(port)
-		sock.connect((host,port))
+		conn = RTPConnection(rwnd, 0)
+		conn.connect(sock, (host, port))
+		print conn
+		#global sock
+		#sock = RTPSocket()
+		#sock.rwnd = rwnd
+		#sock.connect((host,port))
 		print "Connected"
-		return sock
+		return conn
 	except:
 		print('Error: Unable to connect to server.')
 		raise
 		sys.exit(1)
 		
 
-def get_post(file1, file2, sock, host, port, rwnd):
+def get_post(file1, file2, host, port):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	command = "GET-POST"
 	sock.send(command + ":" + file1 + ":" + file2, (host,port))
 
 	#need to implement threading here
-	download_thread = threading.Thread(target = downloadFile, args = (file1, sock, host, port, rwnd))
-	upload_thread = threading.Thread(target = uploadFile, args = (file2, sock, host, port, rwnd))
+	download_thread = threading.Thread(target = downloadFile, args = (file1, host, port))
+	upload_thread = threading.Thread(target = uploadFile, args = (file2, host, port))
 	
 	download_thread.start()
 	upload_thread.start()
@@ -41,25 +45,29 @@ def get_post(file1, file2, sock, host, port, rwnd):
 	#downloadFile(file1, sock, host, port, rwnd)
 	#uploadFile(file2, sock, host, port, rwnd)
 
-def get(filename, sock, host, port, rwnd):
+def get(sock, conn, filename, dsthost, dstport):
 	"""Downloads file from server."""
 	# send filename to server
 	command = "GET"
-	sock.send(command + ":" + filename, (host, port)) #tell the server what operation we are doing
-	downloadFile(filename, sock, host, port, rwnd)
+	print "sending this command and filename"
+	conn.send(command + ":" + filename, (dsthost, dstport))
+	#sock.send(command + ":" + filename, (dsthost, dstport)) #tell the server what operation we are doing
+	print "here"
+	downloadFile(filename, sock, dsthost, dstport)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
 	#having the method in a thread cant hurt
 	#get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
 	#get_thread.start()
 	#get_thread.join()
 
-def downloadFile(filename, sock, host, port, rwnd):
+def downloadFile(filename, host, port):
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 	print "DOWNLOADING FILE"
 	while 1:
 		# receive response from server
 		data, addr = sock.recv()
+		#data = sock.getData()
 		if data == "ERROR: COMMAND NOT RECOGNIZED":
 			ofile.close()
 			os.remove(filename)
@@ -79,7 +87,7 @@ def downloadFile(filename, sock, host, port, rwnd):
 			continue
 	ofile.close()
 
-def uploadFile(filename, sock, host, port, rwnd):
+def uploadFile(filename, host, port):
 	"""Uploads file to server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
@@ -94,10 +102,10 @@ def uploadFile(filename, sock, host, port, rwnd):
 	print "UPLOADING FILE"
 	try:
 		# send file to client
-		msg = send_file.read(rwnd) # read a portion of the file
+		msg = send_file.read(sock.rwnd) # read a portion of the file
 		while msg:
 			sock.send(msg, (host, port))
-			msg = send_file.read(rwnd)
+			msg = send_file.read(sock.rwnd)
 		send_file.close() # close the file
 		sock.send("FILE FINISHED SENDING", (host, port))
 		print "sent file to client"
@@ -122,7 +130,9 @@ def main(argv):
 	rwnd = int(argv[1])
 
 	disconnect = False
-	sock = connect(host, port, rwnd)
+
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	conn = connect(sock, host, port, rwnd)
 
 	while disconnect == False:
 		command = raw_input("> ")
@@ -148,7 +158,7 @@ def main(argv):
 			f = cmd_list[1]
 			g = cmd_list[2]
 			try:
-				get_post(f,g, sock, host, port, rwnd)
+				get_post(conn, f,g, host, port)
 			except:
 				print "Error downloading or uploading file."
 
@@ -161,7 +171,7 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(f, sock, host, port, rwnd)
+				get(conn, f, host, port)
 			except:
 				print "Error downloading file."
 				raise # for debugging

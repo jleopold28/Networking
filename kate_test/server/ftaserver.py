@@ -7,49 +7,80 @@ sys.path.insert(0,'..')
 from rtp import *
 
 lock = threading.Lock()
+sock = None
 
-class clientThread(threading.Thread):
-	def __init__(self, ip, port, sock):
-		threading.Thread.__init__(self)
-		self.ip = ip
-		self.port = port
-		self.sock = sock
-		print "New thread started for "+ip+":"+str(port)
+def clientSession(conn):
+	print conn
+	#print connections[cid]
+	while 1:
+		#packet,addr = sock.recv()
+		data = sock.getData()
+		if data:
+			dest_host = addr[0]
+			dest_port = addr[1]
 
-	def run(self):
-		print "RUNNING THREAD for" + self.ip + ":" + str(self.port)
-		while 1:
-			data,addr = self.sock.recv()
-			if data:
-				dest_host = addr[0]
-				dest_port = addr[1]
-
-				#determine which command we are doing and whith what filename
-				dataList = data.split(":")
-				command = dataList[0]
-				if command == "GET":
-					filename = dataList[1]
-					# send the file (or error msg) to client
-					get(filename, self.sock, dest_host, dest_port, self.sock.rwnd)	
-				elif command == "GET-POST":
-					file1 = dataList[1]
-					file2 = dataList[2]
-					# send the file (or error msg) to client
-					get_post(file1, file2, self.sock, dest_host, dest_port, self.sock.rwnd)
-				else:
-					error_msg = "ERROR: COMMAND NOT RECOGNIZED"
-					self.sock.send(error_msg, (dest_host, dest_port))
+			#determine which command we are doing and whith what filename
+			print data
+			dataList = data.split(":")
+			command = dataList[0]
+			if command == "GET":
+				filename = dataList[1]
+				# send the file (or error msg) to client
+				get(filename, dest_host, dest_port)	
+			elif command == "GET-POST":
+				file1 = dataList[1]
+				file2 = dataList[2]
+				# send the file (or error msg) to client
+				get_post(file1, file2, dest_host, dest_port)
 			else:
-				print "C"
-				continue
+				error_msg = "ERROR: COMMAND NOT RECOGNIZED"
+				sock.send(error_msg, (dest_host, dest_port))
+		else:
+			continue
+
+# class clientThread(threading.Thread):
+# 	def __init__(self, ip, port):
+# 		threading.Thread.__init__(self)
+# 		self.ip = ip
+# 		self.port = port
+# 		#self.sock = sock
+# 		print "New thread started for "+ip+":"+str(port)
+
+# 	def run(self):
+# 		print "RUNNING THREAD for" + self.ip + ":" + str(self.port)
+# 		while 1:
+# 			global sock
+# 			data,addr = sock.recv()
+# 			if data:
+# 				dest_host = addr[0]
+# 				dest_port = addr[1]
+
+# 				#determine which command we are doing and whith what filename
+# 				dataList = data.split(":")
+# 				command = dataList[0]
+# 				if command == "GET":
+# 					filename = dataList[1]
+# 					# send the file (or error msg) to client
+# 					get(filename, sock, dest_host, dest_port, sock.rwnd)	
+# 				elif command == "GET-POST":
+# 					file1 = dataList[1]
+# 					file2 = dataList[2]
+# 					# send the file (or error msg) to client
+# 					get_post(file1, file2, sock, dest_host, dest_port, sock.rwnd)
+# 				else:
+# 					error_msg = "ERROR: COMMAND NOT RECOGNIZED"
+# 					sock.send(error_msg, (dest_host, dest_port))
+# 			else:
+# 				#print "C"
+# 				continue
 
 
-def get_post(file1, file2, sock, host, port, rwnd):
+def get_post(file1, file2, host, port):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 	#need to implement threading here
 
-	upload_thread = threading.Thread(target = uploadFile, args = (file1, sock, host, port, rwnd))
-	download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
+	upload_thread = threading.Thread(target = uploadFile, args = (file1, host, port))
+	download_thread = threading.Thread(target = downloadFile, args = (file2, host, port))
 
 	upload_thread.start()
 	download_thread.start()
@@ -65,14 +96,13 @@ def get_post(file1, file2, sock, host, port, rwnd):
 	#downloadFile(file2, sock, host, port, rwnd)
 	#pass
 
-def get(filename, sock, host, port, rwnd):
-	print "CALLING GET"
+def get(filename, host, port):
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
-	uploadFile(filename, sock, host, port, rwnd)
+	uploadFile(filename, host, port)
 
-def uploadFile(filename, sock, host, port, rwnd):
+def uploadFile(filename, host, port):
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
@@ -87,10 +117,10 @@ def uploadFile(filename, sock, host, port, rwnd):
 	print "UPLOADING FILE"
 	try:
 		# send file to client
-		msg = send_file.read(rwnd) # read a portion of the file
+		msg = send_file.read(sock.rwnd) # read a portion of the file
 		while msg:
 			sock.send(msg, (host, port))
-			msg = send_file.read(rwnd)
+			msg = send_file.read(sock.rwnd)
 		send_file.close() # close the file
 		sock.send("FILE FINISHED SENDING", (host, port))
 		print "sent file to client"
@@ -100,7 +130,7 @@ def uploadFile(filename, sock, host, port, rwnd):
 		print "Error: Unable to send file."
 		#lock.release()
 
-def downloadFile(filename, sock, host, port, rwnd):
+def downloadFile(filename, host, port):
 	extensionList = filename.split(".")
 	ofile = open("post_G." + extensionList[1], "wb") # open in write bytes mode
 	print "DOWNLOADING FILE"
@@ -134,25 +164,40 @@ def main(argv):
 
 	# create socket and bind to port
 	try:
-		sock = RTPSocket()
-		sock.rwnd = rwnd
+		#create only 1 UDP socket
+		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		#bind it to the server host and port
 		sock.bind((host, port))
+
+		#sock = RTPSocket()
+		#sock.rwnd = rwnd
+		#sock.bind((host, port))
 
 		#mainThread = threading.Thread()
 		#mainThread.setDaemon(True)
 
-		threads = []
+		#threads = []
+		#connections = []
+		#connectionID
+		cid = 0
 		while 1:
 			print "Waiting for incoming connections..."
-			client_addr = sock.accept()
-			newthread = clientThread(client_addr[0], client_addr[1], sock)
-			#newthread.setDaemon(True)
+			conn = RTPConnection(rwnd, cid)
+			conn.accept(sock, (host, port))
+			#connections.append(conn)
+			newthread = threading.Thread(target = clientSession, args = (conn,))
+			#newthread = threading.Thread(target = sock.accept(), args = (client_addr, ))
 			newthread.start()
+			#clientSession(client_addr)
+			#newthread = clientThread(client_addr[0], client_addr[1])
+			#newthread.setDaemon(True)
+			
+			#newthread.start()
 			#newthread.join()
-			threads.append(newthread)
+			#threads.append(newthread)
 
-		for t in threads:
-			t.join()
+		#for t in threads:
+		#	t.join()
 		
 		#sock.accept()
 
