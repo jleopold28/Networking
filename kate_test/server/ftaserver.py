@@ -102,6 +102,7 @@ def get(sock, conn, filename):
 	uploadFile(sock, conn, filename)
 
 def uploadFile(sock, conn, filename):
+	print "UPLOADING FILE"
 	host = conn.dst_host
 	port = conn.dst_port
 	"""Uploads file to client. Called whenever filename is received from server."""
@@ -116,7 +117,6 @@ def uploadFile(sock, conn, filename):
 		send_file = None
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
-	print "UPLOADING FILE"
 	try:
 		# send file to client
 		msg = send_file.read(conn.rwnd) # read a portion of the file

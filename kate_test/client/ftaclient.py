@@ -58,14 +58,13 @@ def get(sock, conn, filename, dsthost, dstport):
 	#get_thread.join()
 
 def downloadFile(sock, conn, filename):
+	print "DOWNLOADING FILE"
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
-	print "DOWNLOADING FILE"
 	while 1:
 		# receive response from server
 		#data, addr = sock.recv(sock)
 		data, addr = conn.recv(sock)
-		print data
 		#data = sock.getData()
 		if data == "ERROR: COMMAND NOT RECOGNIZED":
 			ofile.close()

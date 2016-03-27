@@ -166,7 +166,6 @@ class RTPConnection:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
-		print self.packetList
 		self.base = 0 
 		self.nextseqnum = 0
 		ackLastPacket = False
@@ -174,8 +173,7 @@ class RTPConnection:
 			if(self.nextseqnum < self.base + self.N):
 				#if we do a pop, the index automatically changes, so just index the packet list
 				packetToSend = self.packetList[self.nextseqnum]
-				print "SEND:"
-				print packetToSend
+				print "SND: " + str(packetToSend)
 				sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr, sock])
@@ -208,7 +206,7 @@ class RTPConnection:
 					else:
 						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr, sock])
 						t.start()
-						
+
 			if self.packetList[-1].isACKED:
 				ackLastPacket = True
 
@@ -233,8 +231,7 @@ class RTPConnection:
 				header = rcvpkt.header
 				if rcvpkt and header.source_port == self.dst_port:
 					rcv_port = rcv_address[1]
-					#print "Received Packet:"
-					#print rcvpkt
+					print "RCV: " + str(rcvpkt)
 					#rint expectedseqnum
 					# if packet with expected seqnum (in order) is received:
 					if rcvpkt.header.seqnum == expectedseqnum:
@@ -300,8 +297,7 @@ class RTPConnection:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
 		packet = RTPPacket(header, "")
-		print "Sending SYN"
-		print packet
+		print "SND: " + str(packet)
 		sock.sendto(packet.makeBytes(), dstaddr)
 		#print "Sent SYN"
 
@@ -319,8 +315,7 @@ class RTPConnection:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
-		print "Sending ACK"
-		print packet
+		print "ACK: " + str(packet)
 		sock.sendto(packet.makeBytes(), dstaddr)
 
 
@@ -339,8 +334,7 @@ class RTPConnection:
 		packet = RTPPacket(header, "")
 	
 		#print packet
-		print "Sending SYNACK"
-		print packet
+		print "SYNACK: "+ str(packet)
 		sock.sendto(packet.makeBytes(), dstaddr)
 
 
