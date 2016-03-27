@@ -6,7 +6,6 @@ sys.path.insert(0,'..')
 from rtp import *
 
 lock = threading.Lock()
-sock = None
 
 def connect(sock, host, port, rwnd):
 	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
@@ -26,7 +25,7 @@ def connect(sock, host, port, rwnd):
 		sys.exit(1)
 		
 
-def get_post(file1, file2, host, port):
+def get_post(sock, conn, file1, file2, host, port):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	command = "GET-POST"
 	sock.send(command + ":" + file1 + ":" + file2, (host,port))
@@ -49,24 +48,24 @@ def get(sock, conn, filename, dsthost, dstport):
 	"""Downloads file from server."""
 	# send filename to server
 	command = "GET"
-	print "sending this command and filename"
-	conn.send(command + ":" + filename, (dsthost, dstport))
+	conn.send(sock, command + ":" + filename, (dsthost, dstport))
 	#sock.send(command + ":" + filename, (dsthost, dstport)) #tell the server what operation we are doing
-	print "here"
-	downloadFile(filename, sock, dsthost, dstport)
+	downloadFile(sock, conn, filename)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
 	#having the method in a thread cant hurt
 	#get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
 	#get_thread.start()
 	#get_thread.join()
 
-def downloadFile(filename, host, port):
+def downloadFile(sock, conn, filename):
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 	print "DOWNLOADING FILE"
 	while 1:
 		# receive response from server
-		data, addr = sock.recv()
+		#data, addr = sock.recv(sock)
+		data, addr = conn.recv(sock)
+		print data
 		#data = sock.getData()
 		if data == "ERROR: COMMAND NOT RECOGNIZED":
 			ofile.close()
@@ -158,7 +157,7 @@ def main(argv):
 			f = cmd_list[1]
 			g = cmd_list[2]
 			try:
-				get_post(conn, f,g, host, port)
+				get_post(sock, conn, f,g, host, port)
 			except:
 				print "Error downloading or uploading file."
 
@@ -171,7 +170,7 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(conn, f, host, port)
+				get(sock, conn, f, host, port)
 			except:
 				print "Error downloading file."
 				raise # for debugging
