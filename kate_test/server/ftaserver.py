@@ -9,11 +9,11 @@ from rtp import *
 lock = threading.Lock()
 sock = None
 
-def clientSession(conn, sock):
+def clientSession(conn):
 	print conn
 	#print connections[cid]
 	while 1:
-		data,addr = conn.recv(sock)
+		data,addr = conn.recv()
 		#ata = sock.getData()
 		if data:
 			#dest_host = addr[0]
@@ -24,15 +24,15 @@ def clientSession(conn, sock):
 			if command == "GET":
 				filename = dataList[1]
 				# send the file (or error msg) to client
-				get(sock, conn, filename)	
+				get(conn, filename)	
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
 				# send the file (or error msg) to client
-				get_post(sock, conn, file1, file2)
+				get_post(conn, file1, file2)
 			else:
 				error_msg = "ERROR: COMMAND NOT RECOGNIZED"
-				conn.send(sock, error_msg, (conn.dst_host, conn.dst_port))
+				conn.send(error_msg, (conn.dst_host, conn.dst_port))
 				#sock.send(error_msg, (dest_host, dest_port))
 		else:
 			continue
@@ -95,13 +95,13 @@ def get_post(file1, file2, host, port):
 	#downloadFile(file2, sock, host, port, rwnd)
 	#pass
 
-def get(sock, conn, filename):
+def get(conn, filename):
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
-	uploadFile(sock, conn, filename)
+	uploadFile(conn, filename)
 
-def uploadFile(sock, conn, filename):
+def uploadFile(conn, filename):
 	print "UPLOADING FILE"
 	host = conn.dst_host
 	port = conn.dst_port
@@ -112,7 +112,7 @@ def uploadFile(sock, conn, filename):
 	#print sock.rwnd
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
-		conn.send(sock, error_msg, (host,port))
+		conn.send(error_msg, (host,port))
 		#sock.send(error_msg, (host, port))
 		send_file = None
 	else:
@@ -121,11 +121,11 @@ def uploadFile(sock, conn, filename):
 		# send file to client
 		msg = send_file.read(conn.rwnd) # read a portion of the file
 		while msg:
-			conn.send(sock, msg, (host,port))
+			conn.send(msg, (host,port))
 			#sock.send(msg, (host, port))
 			msg = send_file.read(conn.rwnd)
 		send_file.close() # close the file
-		conn.send(sock, "FILE FINISHED SENDING", (host, port))
+		conn.send("FILE FINISHED SENDING", (host, port))
 		print "sent file to client"
 	except Exception, e:
 		if send_file:
@@ -184,14 +184,16 @@ def main(argv):
 		#connections = []
 		#connectionID
 		cid = 0
-		while 1:
-			print "Waiting for incoming connections..."
-			conn = RTPConnection(rwnd, cid)
-			conn.accept(sock, (host, port))
+		#while 1:
+
+			#print "Waiting for incoming connections..."
+		conn = RTPConnection(sock, rwnd, cid)
+		conn.accept((host, port))
+		clientSession(conn)
 			#connections.append(conn)
-			newthread = threading.Thread(target = clientSession, args = (conn,sock))
+			#newthread = threading.Thread(target = clientSession, args = (conn,))
 			#newthread = threading.Thread(target = sock.accept(), args = (client_addr, ))
-			newthread.start()
+			#newthread.start()
 			#clientSession(client_addr)
 			#newthread = clientThread(client_addr[0], client_addr[1])
 			#newthread.setDaemon(True)
