@@ -1,5 +1,5 @@
 PA 2 - Design and Implement a Reliable Transport Protocol
-March 28, 2016
+April 20, 2016
 
 James Leopold	jleopold3@gatech.edu
 Kate Unsworth	kunsworth@gatech.edu
@@ -9,8 +9,8 @@ FILES SUBMITTED
 
 dbclientRTP.py	relational database client
 dbengineRTP.py	relational database server
-ftaclient.py		file transfer application client
-ftaserver.py		file transfer application server
+ftaclient.py	file transfer application client
+ftaserver.py	file transfer application server
 README.txt		readme
 rtp.py			reliable transfer protocol source code
 Sample.txt		sample output file
@@ -26,17 +26,25 @@ I. How RTP works
 		RTP establishes a connection with a three-way handshake (similar to TCP). First the server must bind to a port and listen for a SYN from the client. The client requests a connection by sending a SYN to the server with seqnum=client_isn (a randomly generated integer). The server receives the SYN and sends a SYNACK to the client with seqnum=server_isn (randomly generated integer) and acknum=client_isn+1 to grant the connection. Last, the client replies with an ACK to acknowledge the connection. The ACK has seqnum=client_isn+1 and acknum=server_isn+1.
 
 	B. Connection termination
-		RTP terminates a connection with a four-way handshake (similar to TCP). Either the client or the server may initiate the connection termination. The endpoint terminating the connection first (endpoint A) sends a FIN to the other endpoint (B). B receives the FIN and replies to A with an ACK to acknowledge that the connection will be ended. A will close the connection when this ACK is received. B waits a few seconds for the ACK to be received, then closes the connection.
+		RTP terminates a connection with a four-way handshake (similar to TCP but with separate clientClose and serverClose methods). The client initiates the connection termination by sending a FIN to the server. The client then starts a timer and waits to receive an ACK from the server indicating that it has received the FIN and will also begin connection termination. Meanwhile, the server has called serverClose because it knows to do so when a FIN packet is received. It sends an ACK to the client, followed by a FIN. When the client receives the ACK from the server, the client then waits for a FIN, and sends an ACK back to the server when the FIN is received. The client waits 2 * the RTT of an RTP packet to make sure the ACK to the server gets received (when this happens, the server closes its side of the connection). Then the client closes its side of the connection. 
 
 	C. Flow control
-		RTP provides receiver window-based flow control using the Go-Back-N protocol. Window size, N, is static and is configured when the connection is set up. [more on this later]
+		RTP provides window-based flow control using the Go-Back-N protocol. Window size, N, is static and is configured when the connection is set up. 
+
+		The sender initially sets two integer variables base and nextseqnum to 0. If nextseqnum is less than base + N, this means the nextseqnum is within the send window, so the packet is sent. Otherwise it is not sent. After a packet is sent, the sender waits for response ACKs from the receiver. When the sender receives a cumulative ACK (indicating all packets up to that acknum have been received), it increments base by the acknum + 1. This moves the send window up to begin sending the next N unACKed packets. If the timer for the first packet in the current send window times out before an ACK is received, the send window remains the same and the packets in that window are re-sent.
+
+		On the receiver side, when the receiver receives a packet from the sender, it checks if the seqnum of the packet is equal to the seqnum it expects to receive next (expectedseqnum). If so, the packet is appended to the receive buffer, expectedseqnum is incremented by 1 so the next packet can be received, and an ACK is sent for that packet. If the seqnum is not equal to the expectedseqnum the packet is ignored. This prevents packets from being received out of order.
+
+		If a packet has eom=1, the receiver handles it differently because this indicates that the packet is at the end of a message. Since RTP is connection-oriented, the eom value is used to tell the receiver where one message ends and another begins.
 
 	D. Duplicate packets
+		Packets have sequence numbers and acknowledgement numbers. The RTP receiver extracts the data from a packet only if the sequence number of the packet is equal to the expected sequence number (the sequence number of the next packet that should be received). Otherwise, the ACK for the most recently received in-order packet will be re-sent, causing the sender to re-send the packets in the send window. The expected sequence number is incemented by 1 when the expected packet is received and the ACK is sent. If the sender sends a duplicate packet (one that has already been received), the seqnum of that packet will not equal the expected seqnum so the receiver will discard it.
 
 	E. De-multiplexing
+		RTP uses connection de-multiplexing to allow multiple clients to communicate with the server simultaneously. This is done with multithreading. When an application is started on the server side, one RTP socket is created and then for each client that connects to that socket, a new RTPCConnection is created in a new thread. The threads allow the connections to all run simultaneously. A lock is used to ensure that the threads do not access the same global variables at the same time. 
 
 	F. Byte-stream semantics
-		RTP assigns sequence numbers to packets to make sure they are delivered in the correct order. When the RTP receiver receives a packet it sends an ACK to the sender with the acknum (acknowledgement number) indicating which packet the ACK is for. The receiver discards any packets where the sequence number is not equal to the expected sequence number. This prevents the receiver from receiving duplicate packets or out-of-order packets. [more later]
+		RTP assigns sequence numbers to packets to make sure they are delivered in the correct order. When the RTP receiver receives a packet it sends an ACK to the sender with the acknum (acknowledgement number) indicating which packet the ACK is for. The receiver discards any packets where the sequence number is not equal to the expected sequence number. This prevents the receiver from receiving duplicate packets or out-of-order packets. RTP connections have send and receive buffers to hold packets that are waiting to be sent to the receiver or are ready to be sent from the receiver to the application layer.
 
 	G. Special values/parameters
 		1. isACKed: 
@@ -171,6 +179,16 @@ IV. Programming interface
 
 
 V. Algorithmic descriptions of non-trivial RTP functions
+	A. RTPConnection.accept(self, sock, socket_addr):
+		This method is the server side of a 3-way handshake. It has no return value.
+		- The self.socket_addr variable (host, port) for the socket passed in is set to the address passed in. 
+		- The connection "listens" for a SYN from the client. If a SYN is received, a connection with the client that sent the SYN is set up. 
+		- A server_isn is randomly generated
+		- The server sends a SYNACK to the client with seqnum=server_isn.
+		- The server waits to receive a response from the client. The function ends if the ACK with the expected seqnum and acknum is received from the expected client.
+	B. RTPConnection.connect(self, sock, destination_address):
+		This method is on the client side of a 3-way handshake. It connects to the destionation_address passed in and has no return value.
+		- The self. [more later]
 
 ---
 KNOWN BUGS AND LIMITATIONS
