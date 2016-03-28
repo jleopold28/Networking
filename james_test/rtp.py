@@ -30,6 +30,10 @@ class RTPConnection:
 		if len(self.recv_buffer) != 0 :
 			return self.recv_buffer
 
+	def addDataToRecv(self, packet):
+		"""NEW: Appends a packet to recv buffer."""
+		self.recv_buffer.append(packet)
+
 	def addDataToSend(self, data, addr):
 		dataSegments = []
 		
@@ -277,6 +281,7 @@ class RTPSocket:
 		#print "Calling recv"
 		#global data_buffer
 		#data_buffer = ""
+		conn = None # connection from which we are receiving
 		while True:
 			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 			if response:
@@ -284,6 +289,7 @@ class RTPSocket:
 					if connections[k].dst_addr == rcv_address:
 
 						connections[k].addSendBuffer(self.getPacket(response))
+						conn = connections[k] # set conn now that it is known
 
 			else:
 				continue
@@ -299,8 +305,10 @@ class RTPSocket:
 						# set end_of_message = True if eom = 1 in packet header
 						if rcvpkt.header.eom == 1:
 							end_of_message = True
-						# extract data - add onto string
-						data_buffer += rcvpkt.data
+
+						# extract data - append to the connection's receive buffer
+						conn.addDataToRecv(rcvpkt.data)
+						
 						#packets_received.append(rcvpkt)
 						#data_received += rcvpkt.data
 						# send an ACK for the packet and increment expectedseqnum
@@ -323,7 +331,7 @@ class RTPSocket:
 
 		expectedseqnum = 0
 		#packets_received = [] # received data as string
-		end_of_message = False # need to implement eom
+		end_of_message = False
 		last_acknum_sent = None
 		while end_of_message == False:
 			# receive a packet from sender
@@ -345,6 +353,7 @@ class RTPSocket:
 							end_of_message = True
 						# extract data - add onto string
 						data_buffer += rcvpkt.data
+\
 						#packets_received.append(rcvpkt)
 						#data_received += rcvpkt.data
 						# send an ACK for the packet and increment expectedseqnum
