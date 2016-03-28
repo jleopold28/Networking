@@ -9,13 +9,17 @@ from rtp import *
 lock = threading.Lock()
 sock = None
 
-def clientSession(conn):
-	print conn
+def clientSession(conn_id, addr):
+	print conn_id
+	print addr
 	#print connections[cid]
 	while 1:
-		data,addr = conn.recv()
+		data = sock.getData(conn_id)
 		#ata = sock.getData()
 		if data:
+			print data
+			sys.exit(1)
+
 			#dest_host = addr[0]
 			#dest_port = addr[1]
 			#determine which command we are doing and whith what filename
@@ -95,16 +99,18 @@ def get_post(file1, file2, host, port):
 	#downloadFile(file2, sock, host, port, rwnd)
 	#pass
 
-def get(conn, filename):
+def get(conn_id, filename):
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
-	uploadFile(conn, filename)
+	uploadFile(conn_id, filename)
 
-def uploadFile(conn, filename):
+def uploadFile(conn_id, filename):
 	print "UPLOADING FILE"
-	host = conn.dst_host
-	port = conn.dst_port
+	host = sock.connections[conn_id].dst_host
+	port = sock.connections[conn_id].dst_host
+	#host = conn.dst_host
+	#port = conn.dst_port
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
@@ -112,7 +118,7 @@ def uploadFile(conn, filename):
 	#print sock.rwnd
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
-		conn.send(error_msg, (host,port))
+		sock.send(error_msg, conn_id)
 		#sock.send(error_msg, (host, port))
 		send_file = None
 	else:
@@ -121,11 +127,10 @@ def uploadFile(conn, filename):
 		# send file to client
 		msg = send_file.read(conn.rwnd) # read a portion of the file
 		while msg:
-			conn.send(msg, (host,port))
-			#sock.send(msg, (host, port))
+			sock.send(msg, conn_id)
 			msg = send_file.read(conn.rwnd)
 		send_file.close() # close the file
-		conn.send("FILE FINISHED SENDING", (host, port))
+		conn.send("FILE FINISHED SENDING", conn_id)
 		print "sent file to client"
 	except Exception, e:
 		if send_file:
@@ -169,13 +174,14 @@ def main(argv):
 	# create socket and bind to port
 	try:
 		#create only 1 UDP socket
-		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		#sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		#bind it to the server host and port
+		#sock.bind((host, port))
+
+		sock = RTPSocket()
+		sock.rwnd = rwnd
 		sock.bind((host, port))
 
-		#sock = RTPSocket()
-		#sock.rwnd = rwnd
-		#sock.bind((host, port))
 
 		#mainThread = threading.Thread()
 		#mainThread.setDaemon(True)
@@ -183,13 +189,16 @@ def main(argv):
 		#threads = []
 		#connections = []
 		#connectionID
-		cid = 0
-		#while 1:
+		conn_id = 0
+		while 1:
+			print "Waiting for incoming connections..."
+			conn_id, addr = sock.accept()
+			newthread = threading.Thread(target = clientSession, args = (conn_id, addr,))
+			newthread.start()
 
-			#print "Waiting for incoming connections..."
-		conn = RTPConnection(sock, rwnd, cid)
-		conn.accept((host, port))
-		clientSession(conn)
+		#conn = RTPConnection(sock, rwnd, cid)
+		#conn.accept((host, port))
+		#clientSession(conn)
 			#connections.append(conn)
 			#newthread = threading.Thread(target = clientSession, args = (conn,))
 			#newthread = threading.Thread(target = sock.accept(), args = (client_addr, ))

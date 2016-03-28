@@ -44,27 +44,30 @@ def get_post(sock, conn, file1, file2, host, port):
 	#downloadFile(file1, sock, host, port, rwnd)
 	#uploadFile(file2, sock, host, port, rwnd)
 
-def get(conn, filename, dsthost, dstport):
+def get(conn_id, addr, filename):
 	"""Downloads file from server."""
 	# send filename to server
-	command = "GET"
-	conn.send(command + ":" + filename, (dsthost, dstport))
+
+	#sock.send("GET:" + filename, addr)
+
+	conn.addDataToSend("GET:" + filename, addr)
 	#sock.send(command + ":" + filename, (dsthost, dstport)) #tell the server what operation we are doing
-	downloadFile(conn, filename)
+	downloadFile(conn_id, filename)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
 	#having the method in a thread cant hurt
 	#get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
 	#get_thread.start()
 	#get_thread.join()
 
-def downloadFile(conn, filename):
+def downloadFile(conn_id, filename):
 	print "DOWNLOADING FILE"
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
-		#data, addr = sock.recv(sock)
-		data, addr = conn.recv()
+		data = sock.getData(conn_id)
+		#data, addr = sock.recv(conn_id)
+		#data, addr = conn.recv()
 		#data = sock.getData()
 		if data == "ERROR: COMMAND NOT RECOGNIZED":
 			ofile.close()
@@ -129,10 +132,9 @@ def main(argv):
 
 	disconnect = False
 
-	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-	conn = RTPConnection(sock, rwnd, 0)
-	conn.connect((host, port))
+	sock = RTPSocket()
+	sock.rwnd = rwnd
+	conn_id, addr = sock.connect((host,port))
 
 	while disconnect == False:
 		command = raw_input("> ")
@@ -171,7 +173,7 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(conn, f, host, port)
+				get(conn_id, addr, f)
 			except:
 				print "Error downloading file."
 				raise # for debugging
