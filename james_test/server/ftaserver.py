@@ -22,9 +22,7 @@ def listen():
 	sock.recv()
 
 def clientSession(conn, addr):
-	print "STARTING CLIENT SESSION"
-	print conn
-	print addr
+	print "STARTING CLIENT SESSION at " + str(addr)
 	#print connections[cid]
 	#listen = threading.Thread(target = sock.listen())
 	#listen.start()
@@ -41,15 +39,19 @@ def clientSession(conn, addr):
 			if command == "GET":
 				filename = dataList[1]
 				# send the file (or error msg) to client
-				get(conn, addr, filename)	
+				get(conn, addr, filename)
+				break
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
 				# send the file (or error msg) to client
 				get_post(conn, addr, file1, file2)
+				break
 				#sock.send(error_msg, (dest_host, dest_port))
 		else:
 			continue
+
+	sock.close()
 
 # class clientThread(threading.Thread):
 # 	def __init__(self, ip, port):

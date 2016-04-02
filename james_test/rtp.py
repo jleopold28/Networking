@@ -135,7 +135,7 @@ class RTPSocket:
 
 
 	def send(self, data, addr):
-		print "Calling send with data:" + data + " to addr " + str(addr)
+		#print "Calling send with data:" + data + " to addr " + str(addr)
 		"""
 		Sends data through a socket to an address
 		data: data to send to address
@@ -173,7 +173,7 @@ class RTPSocket:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
-		print "len of packet list is " + str(len(self.packetList))
+		#print "len of packet list is " + str(len(self.packetList))
 
 		self.base = 0 
 		self.nextseqnum = 0
@@ -181,7 +181,7 @@ class RTPSocket:
 		while ackLastPacket == False:
 			if(self.nextseqnum < self.base + self.N):
 				#if we do a pop, the index automatically changes, so just index the packet list
-				print self.nextseqnum
+				#print self.nextseqnum
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")

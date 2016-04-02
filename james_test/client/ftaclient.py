@@ -83,17 +83,14 @@ def downloadFile(conn, filename):
 		#data, addr = sock.recv(conn_id)
 		#data, addr = conn.recv()
 		#data = sock.getData()
-		print data
-		sys.exit(1)
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove(filename)
 			print data
 			break
-		elif data == "EOF":
-			break
-		elif data:
-			ofile.write(data)			
+		elif data[-3:]  == "EOF":
+			ofile.write(data)	
+			break	
 		else:
 			continue
 	ofile.close()
