@@ -2,10 +2,21 @@
 import os
 import sys
 import threading
+import Queue
+
 sys.path.insert(0,'..')
 from rtp import *
 
 lock = threading.Lock()
+sock = None
+q = Queue.Queue()
+
+def listen():
+	sock.recv()
+
+def test(host,port):
+	conn = sock.connect((host, port))
+	q.put(conn)
 
 def connect(sock, host, port, rwnd):
 	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
@@ -44,28 +55,32 @@ def get_post(sock, conn, file1, file2, host, port):
 	#downloadFile(file1, sock, host, port, rwnd)
 	#uploadFile(file2, sock, host, port, rwnd)
 
-def get(conn_id, addr, filename):
+def get(conn, filename, host, port):
 	"""Downloads file from server."""
 	# send filename to server
 
 	#sock.send("GET:" + filename, addr)
-
-	conn.addDataToSend("GET:" + filename, addr)
+	print "Calling get on the client side"
+	sock.send("GET:" + filename, (host,port))
 	#sock.send(command + ":" + filename, (dsthost, dstport)) #tell the server what operation we are doing
-	downloadFile(conn_id, filename)
+	downloadFile(conn, filename)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
 	#having the method in a thread cant hurt
 	#get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
 	#get_thread.start()
 	#get_thread.join()
 
-def downloadFile(conn_id, filename):
+def downloadFile(conn, filename):
 	print "DOWNLOADING FILE"
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
+
+	listenThread = threading.Thread(target = listen)
+	listenThread.start()
+
 	while 1:
 		# receive response from server
-		data = sock.getData(conn_id)
+		data = conn.getData()
 		#data, addr = sock.recv(conn_id)
 		#data, addr = conn.recv()
 		#data = sock.getData()
@@ -132,9 +147,18 @@ def main(argv):
 
 	disconnect = False
 
+	global sock
 	sock = RTPSocket()
 	sock.rwnd = rwnd
-	conn_id, addr = sock.connect((host,port))
+
+	#connectThread = threading.Thread(target = test, args = (host,port,))
+
+	#with lock:
+	#	connectThread.start()
+	#	conn = q.get()
+
+	conn = sock.connect((host,port))
+
 
 	while disconnect == False:
 		command = raw_input("> ")
@@ -160,7 +184,7 @@ def main(argv):
 			f = cmd_list[1]
 			g = cmd_list[2]
 			try:
-				get_post(conn, f,g, host, port)
+				get_post(conn, f, g, host, port)
 			except:
 				print "Error downloading or uploading file."
 
@@ -173,7 +197,7 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(conn_id, addr, f)
+				get(conn, f, host, port)
 			except:
 				print "Error downloading file."
 				raise # for debugging

@@ -3,23 +3,36 @@ import os
 import sys
 import time
 import threading
+import Queue
 sys.path.insert(0,'..')
 from rtp import *
 
 lock = threading.Lock()
 sock = None
+q = Queue.Queue()
 
-def clientSession(conn_id, addr):
-	print conn_id
+def test():
+	conn, addr = sock.accept()
+	print "AFTER ACCEPT"
+	print conn
+	print addr
+	q.put((conn,addr))
+
+def listen():
+	sock.recv()
+
+def clientSession(conn, addr):
+	print "STARTING CLIENT SESSION"
+	print conn
 	print addr
 	#print connections[cid]
-	while 1:
-		data = sock.getData(conn_id)
-		#ata = sock.getData()
-		if data:
-			print data
-			sys.exit(1)
+	#listen = threading.Thread(target = sock.listen())
+	#listen.start()
 
+	while 1:
+		#data = sock.getData(conn_id)
+		data = conn.getData()
+		if data:
 			#dest_host = addr[0]
 			#dest_port = addr[1]
 			#determine which command we are doing and whith what filename
@@ -28,15 +41,15 @@ def clientSession(conn_id, addr):
 			if command == "GET":
 				filename = dataList[1]
 				# send the file (or error msg) to client
-				get(conn, filename)	
+				get(conn, addr, filename)	
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
 				# send the file (or error msg) to client
-				get_post(conn, file1, file2)
+				get_post(conn, addr, file1, file2)
 			else:
 				error_msg = "ERROR: COMMAND NOT RECOGNIZED"
-				conn.send(error_msg, (conn.dst_host, conn.dst_port))
+				sock.send(error_msg, (addr))
 				#sock.send(error_msg, (dest_host, dest_port))
 		else:
 			continue
@@ -77,7 +90,6 @@ def clientSession(conn_id, addr):
 # 				#print "C"
 # 				continue
 
-
 def get_post(file1, file2, host, port):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 	#need to implement threading here
@@ -99,16 +111,16 @@ def get_post(file1, file2, host, port):
 	#downloadFile(file2, sock, host, port, rwnd)
 	#pass
 
-def get(conn_id, filename):
+def get(conn, addr, filename):
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
-	uploadFile(conn_id, filename)
+	uploadFile(conn, addr, filename)
 
-def uploadFile(conn_id, filename):
+def uploadFile(conn, addr, filename):
 	print "UPLOADING FILE"
-	host = sock.connections[conn_id].dst_host
-	port = sock.connections[conn_id].dst_host
+	#host = sock.connections[conn_id].dst_host
+	#port = sock.connections[conn_id].dst_host
 	#host = conn.dst_host
 	#port = conn.dst_port
 	"""Uploads file to client. Called whenever filename is received from server."""
@@ -118,7 +130,7 @@ def uploadFile(conn_id, filename):
 	#print sock.rwnd
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
-		sock.send(error_msg, conn_id)
+		sock.send(error_msg, addr)
 		#sock.send(error_msg, (host, port))
 		send_file = None
 	else:
@@ -127,10 +139,10 @@ def uploadFile(conn_id, filename):
 		# send file to client
 		msg = send_file.read(conn.rwnd) # read a portion of the file
 		while msg:
-			sock.send(msg, conn_id)
+			sock.send(msg, addr)
 			msg = send_file.read(conn.rwnd)
 		send_file.close() # close the file
-		conn.send("FILE FINISHED SENDING", conn_id)
+		sock.send("FILE FINISHED SENDING", addr)
 		print "sent file to client"
 	except Exception, e:
 		if send_file:
@@ -178,10 +190,15 @@ def main(argv):
 		#bind it to the server host and port
 		#sock.bind((host, port))
 
+		global sock
+		global lock
 		sock = RTPSocket()
 		sock.rwnd = rwnd
 		sock.bind((host, port))
 
+		#listenThread = threading.Thread(target = listen)
+		#listenThread.start()
+		#thread.start_new_thread(sock.listen())
 
 		#mainThread = threading.Thread()
 		#mainThread.setDaemon(True)
@@ -189,12 +206,40 @@ def main(argv):
 		#threads = []
 		#connections = []
 		#connectionID
-		conn_id = 0
+		#conn_id = 0
+
+		#test = threading.Thread(target = makeconnection)
+		#test.start()
 		while 1:
 			print "Waiting for incoming connections..."
-			conn_id, addr = sock.accept()
-			newthread = threading.Thread(target = clientSession, args = (conn_id, addr,))
+			#acceptThread = threading.Thread(target = test)
+
+			#with lock:
+		#		print "we have the lock"
+		#		acceptThread.start()
+		#		print "after accept"
+		#		conn, addr = q.get()
+		#		print conn
+		#		print addr
+		#		print "test"
+			conn, addr = sock.accept()
+			newthread = threading.Thread(target = clientSession, args = (conn, addr,))
+			
+			listenThread = threading.Thread(target = listen)
+			listenThread.start()
 			newthread.start()
+
+		#while 1:
+		#		print "Waiting for incoming connections..."
+			#conn, addr = sock.accept()
+		#	test = threading.Thread(target = sock.accept())
+	#		test.start()
+	#		print test
+
+			#newthread = threading.Thread(target = clientSession)
+	#		newthread = threading.Thread(target = clientSession, args = (conn, addr,))
+	#		newthread.start()
+			#connections.append(conn)
 
 		#conn = RTPConnection(sock, rwnd, cid)
 		#conn.accept((host, port))

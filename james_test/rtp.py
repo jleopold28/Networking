@@ -19,54 +19,12 @@ class RTPConnection:
 		self.dst_port = destination_address[1]
 
 		self.data = ""
-		self.recv_buffer = []
-		self.send_buffer = []
 
 	def getData(self):
-		if len(self.data) != 0:
-			return self.data
+		return self.data
 
-	def getRecvBuffer(self):
-		if len(self.recv_buffer) != 0 :
-			return self.recv_buffer
-
-	def addDataToRecv(self, packet):
-		"""NEW: Appends a packet to recv buffer."""
-		self.recv_buffer.append(packet)
-
-	def addDataToSend(self, data, addr):
-		dataSegments = []
-		
-		#break up the data into size MSS 
-		for segment in range(0, len(data), RTPPacket.MSS):
-			if segment+RTPPacket.MSS > len(data): 							#if we go out of bounds:
-				dataSegments.append(data[segment:]) 						#	append from segment to the end
-			else:
-				dataSegments.append(data[segment:segment+RTPPacket.MSS]) 	#	append segment
-
-		packetList = []
-
-		seqnum = 0 #initialize to 0
-		for d in range(len(dataSegments)):
-			#create a packet
-			source_port = self.socket_port
-			dest_port = addr[1] #addr = (host,port)
-			acknum = 0
-			ACK = 0
-			SYN = 0 
-			FIN = 0 
-			rwnd = self.rwnd
-			checksum = 0
-			# if this is the last data segment, set eom = 1 in packet header
-			if d == len(dataSegments) - 1:
-				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 1)
-			else:
-				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 0)
-			packet = RTPPacket(header, dataSegments[d])
-			packetList.append(packet)
-			seqnum = seqnum + 1
-
-		self.send_buffer = self.send_buffer + packetList
+	def addData(self, data):
+		self.data += data
 
 
 class RTPSocket:
@@ -78,9 +36,6 @@ class RTPSocket:
 		self.N = 5
 		self.connections = {}
 
-	def getData(self, conn_id):
-		return connections[conn_id].getData()
-
 	def bind(self, socket_addr):
 		self.socket_addr = socket_addr
 		self.socket_host = socket_addr[0]
@@ -90,30 +45,21 @@ class RTPSocket:
 	def accept(self):
 		"""Server side of 3 way handshake; accepts connection to client."""
 		 #"listen" for SYN from client
+		print "calling accept"
 		while 1:
-
-			#s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-			#print s
-			#print s.recvfrom(1000)
-			#self.sock.recvfrom(1000)
 			data, dstaddr = self.sock.recvfrom(1024)
-
 			if data:
 				header = self.getPacket(data).header
 				if header.SYN == 1:
+					print "recved SYN"
 					break
 
 		#we got a SYN bit so set up the connection with this client
-
 		server_isn = random.randint(0,1000)
 		acknum = header.seqnum + 1
 
+		print "sent SYNACK"
 		self.sendSYNACK(self.socket_port, dstaddr, server_isn, acknum)
-
-		#print self.socket_port
-		#print "Sending SYNACK with seqnum = " + str(server_isn + 1) + ", acknum = " + str(client_isn + 1)
-		#self.sendSYNACK(self.socket_port, self.dstport, server_isn, acknum, dstaddr)
-		#print "Sent SYNACK"
 
 		#wait to recieve a response from the client
 		while 1:
@@ -125,10 +71,11 @@ class RTPSocket:
 				if header.seqnum == (acknum) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
 					break
 
+		print "Creating connection"
 		conn_id = random.randint(0,100000)
 		conn = RTPConnection(dstaddr, self.socket_port, self.rwnd)
 		self.connections[conn_id] = conn
-		return conn_id, dstaddr
+		return conn, dstaddr
 
 
 	def connect(self, destination_address):
@@ -136,6 +83,7 @@ class RTPSocket:
 		Connects to the desired host and port
 		destination_address: tuple (host, port)
 		"""
+		print "Calling connect"
 		#client side 3 way handshake
 
 		#dst_addr = destination_address
@@ -155,21 +103,14 @@ class RTPSocket:
 		#print "Sending SYN Packet with seqnum = " + str(client_isn)
 		self.sendSYN(self.socket_port, destination_address, client_isn)
 
+		print "sent SYN"
 		#wait to recieve a SYNACK from the server
 		while 1:
 			data, fromaddr = self.sock.recvfrom(100)
-			#data,addr = self.rtpsocket.recvfrom(1000)
-			#packetList, dstaddr = self.recv()
-			#first_packet = packetList[0]
 			if data and fromaddr == destination_address:
 				header = self.getPacket(data).header
-				#print header
 				if header.acknum == (client_isn + 1) and header.ACK == 1 and header.SYN == 1:
-					#self.socket_port = header.dest_port
-					#print "TEST"
-					#print header
-					#print addr
-					#print "Recieved SYNACK"
+					print "Received SYNACK"
 					break
 
 		self.socket_host = ""
@@ -184,14 +125,16 @@ class RTPSocket:
 		#self.socket_port = header.dest_port
 		self.sendACK(self.socket_port, destination_address, seqnum, acknum)
 
+		print "Creating connection"
 		conn_id = random.randint(0,100000)
 		conn = RTPConnection(destination_address, self.socket_port, self.rwnd)
 		self.connections[conn_id] = conn
 
-		return conn_id, destination_address
+		return conn
 
 
 	def send(self, data, addr):
+		print "Calling send with data:" + data + " and addr " + str(addr)
 		"""
 		Sends data through a socket to an address
 		data: data to send to address
@@ -207,7 +150,7 @@ class RTPSocket:
 			else:
 				dataSegments.append(data[segment:segment+RTPPacket.MSS]) 	#	append segment
 
-		self.packetList = []
+		self.packetList = [] #this is our send buffer
 
 		seqnum = 0 #initialize to 0
 		for d in range(len(dataSegments)):
@@ -229,14 +172,19 @@ class RTPSocket:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
+		print "starting to send"
+
+		print len(self.packetList)
+
 		self.base = 0 
 		self.nextseqnum = 0
 		ackLastPacket = False
 		while ackLastPacket == False:
 			if(self.nextseqnum < self.base + self.N):
 				#if we do a pop, the index automatically changes, so just index the packet list
+				print self.nextseqnum
 				packetToSend = self.packetList[self.nextseqnum]
-				#print "SND: " + str(packetToSend)
+				print "SND: " + str(packetToSend)
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
@@ -260,7 +208,7 @@ class RTPSocket:
 				header = self.getPacket(response).header
 
 				if packet and header.ACK == 1 and header.dest_port == self.socket_port: ## and its not corrupt
-					#print packet
+					print "GOT: " + str(packet)
 					#responseHeader = packet.header
 					self.base = packet.header.acknum + 1
 					#print "self base :" + str(self.base)
@@ -275,117 +223,6 @@ class RTPSocket:
 			if self.packetList[-1].isACKED:
 				ackLastPacket = True
 
-
-	def recv(self):
-		"""Receives data at a socket and returns data, address."""
-		#print "Calling recv"
-		#global data_buffer
-		#data_buffer = ""
-		conn = None # connection from which we are receiving
-		while True:
-			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
-			if response:
-				for k in connections:
-					if connections[k].dst_addr == rcv_address:
-
-						connections[k].addSendBuffer(self.getPacket(response))
-						conn = connections[k] # set conn now that it is known
-
-			else:
-				continue
-
-				#rcvpkt = self.getPacket(response)
-			
-				#header = rcvpkt.header
-					#rcv_port = rcv_address[1]
-					#print "RCV: " + str(rcvpkt)
-					#rint expectedseqnum
-					# if packet with expected seqnum (in order) is received:
-					if rcvpkt.header.seqnum == expectedseqnum:
-						# set end_of_message = True if eom = 1 in packet header
-						if rcvpkt.header.eom == 1:
-							end_of_message = True
-
-						# extract data - append to the connection's receive buffer
-						conn.addDataToRecv(rcvpkt.data)
-						
-						#packets_received.append(rcvpkt)
-						#data_received += rcvpkt.data
-						# send an ACK for the packet and increment expectedseqnum
-						#print "sending ACK for packet in recv"
-						seqnum = rcvpkt.header.acknum
-						acknum = rcvpkt.header.seqnum #+ 1
-						self.sendACK(self.socket_port, self.dst_addr, seqnum, acknum)
-						expectedseqnum = expectedseqnum + 1
-						last_acknum_sent = acknum
-					# else: re-send ACK for most recently received in-order packet
-					else:
-						#only re-send the ACK after we have sent one ACK
-						if last_acknum_sent != None:
-							#print "re-sending ACK for packet in recv"
-							seqnum = rcvpkt.header.acknum
-							acknum = last_acknum_sent
-							self.sendACK(self.socket_port, self.dst_addr, seqnum, acknum)
-							# if end_of_message was found, set it back to False 
-							#end_of_message = False
-
-		expectedseqnum = 0
-		#packets_received = [] # received data as string
-		end_of_message = False
-		last_acknum_sent = None
-		while end_of_message == False:
-			# receive a packet from sender
-			#if len(self.data_buffer) < self.rwnd:
-			#else:
-			#	continue
-			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
-			if response:
-				rcvpkt = self.getPacket(response)
-				header = rcvpkt.header
-				if rcvpkt and header.source_port == self.dst_port:
-					rcv_port = rcv_address[1]
-					#print "RCV: " + str(rcvpkt)
-					#rint expectedseqnum
-					# if packet with expected seqnum (in order) is received:
-					if rcvpkt.header.seqnum == expectedseqnum:
-						# set end_of_message = True if eom = 1 in packet header
-						if rcvpkt.header.eom == 1:
-							end_of_message = True
-						# extract data - add onto string
-						data_buffer += rcvpkt.data
-\
-						#packets_received.append(rcvpkt)
-						#data_received += rcvpkt.data
-						# send an ACK for the packet and increment expectedseqnum
-						#print "sending ACK for packet in recv"
-						seqnum = rcvpkt.header.acknum
-						acknum = rcvpkt.header.seqnum #+ 1
-						self.sendACK(self.socket_port, self.dst_addr, seqnum, acknum)
-						expectedseqnum = expectedseqnum + 1
-						last_acknum_sent = acknum
-					# else: re-send ACK for most recently received in-order packet
-					else:
-						#only re-send the ACK after we have sent one ACK
-						if last_acknum_sent != None:
-							#print "re-sending ACK for packet in recv"
-							seqnum = rcvpkt.header.acknum
-							acknum = last_acknum_sent
-							self.sendACK(self.socket_port, self.dst_addr, seqnum, acknum)
-							# if end_of_message was found, set it back to False 
-							#end_of_message = False
-
-		#data_buffer += "END OF FILE"
-		# when end of message is reached, return the data
-		return data_buffer, rcv_address
-		#return self.rtpsocket.recvfrom(1000) # for testing only
-
-	def getData(self):
-		#global data_buffer
-		if len(self.data_buffer) != 0 and self.data_buffer[-11:] == "END OF FILE":
-			return self.data_buffer[:-11]
-		else:
-			return ""
-
 	def timeout(self, addr):
 		""" 
 		Retransmits packets from base to nextseqnum-1
@@ -395,6 +232,69 @@ class RTPSocket:
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
 			self.sock.sendto(self.packetList[i].makeBytes(), addr)
+
+	def recv(self):
+		"""Receives data at a socket and returns data, address."""
+		print "Calling recv"
+		#global data_buffer
+		#data_buffer = ""
+		while True:
+			#response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
+			#if response:
+			#		for k in connections:
+			#		if connections[k].dst_addr == rcv_address:
+			#			connections[k].addRecvBuffer(self.getPacket(response))
+			#else:
+			#	continue
+			expectedseqnum = 0
+			last_acknum_sent = None
+			end_of_message = False
+			while end_of_message == False:
+				response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
+				if response:
+					rcvpkt = self.getPacket(response)
+					header = rcvpkt.header
+					#if rcvpkt and header.source_port == self.dst_port:
+					if rcvpkt and header.dest_port == self.socket_port:
+						rcv_port = rcv_address[1]
+						print "RCV: " + str(rcvpkt)
+						#rint expectedseqnum
+						# if packet with expected seqnum (in order) is received:
+						if rcvpkt.header.seqnum == expectedseqnum:
+							# set end_of_message = True if eom = 1 in packet header
+							if rcvpkt.header.eom == 1:
+								end_of_message = True
+							# extract data - add onto string
+
+							for c in self.connections:
+								if self.connections[c].dst_addr == rcv_address:
+									self.connections[c].addData(rcvpkt.data)
+							#data_buffer += rcvpkt.data
+
+							#packets_received.append(rcvpkt)
+							#data_received += rcvpkt.data
+							# send an ACK for the packet and increment expectedseqnum
+							print "sending ACK for packet in recv"
+							seqnum = rcvpkt.header.acknum
+							acknum = rcvpkt.header.seqnum #+ 1
+							self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
+							expectedseqnum = expectedseqnum + 1
+							last_acknum_sent = acknum
+						# else: re-send ACK for most recently received in-order packet
+						else:
+							#only re-send the ACK after we have sent one ACK
+							if last_acknum_sent != None:
+								print "re-sending ACK for packet in recv"
+								seqnum = rcvpkt.header.acknum
+								acknum = last_acknum_sent
+								self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
+								# if end_of_message was found, set it back to False 
+								#end_of_message = False
+
+		#data_buffer += "END OF FILE"
+		# when end of message is reached, return the data
+		#return data_buffer, rcv_address
+		#return self.rtpsocket.recvfrom(1000) # for testing only
 
 
 	def sendSYN(self, srcport, dstaddr, seqnum):
@@ -429,7 +329,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
-		#print "ACK: " + str(packet)
+		print "ACK: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
