@@ -60,7 +60,6 @@ def get(conn, filename, host, port):
 	# send filename to server
 
 	#sock.send("GET:" + filename, addr)
-	print "Calling get on the client side"
 	sock.send("GET:" + filename, (host,port))
 	#sock.send(command + ":" + filename, (dsthost, dstport)) #tell the server what operation we are doing
 	downloadFile(conn, filename)
@@ -84,21 +83,17 @@ def downloadFile(conn, filename):
 		#data, addr = sock.recv(conn_id)
 		#data, addr = conn.recv()
 		#data = sock.getData()
-		if data == "ERROR: COMMAND NOT RECOGNIZED":
+		print data
+		sys.exit(1)
+		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove(filename)
 			print data
 			break
-		elif data == "ERROR: FILE NOT FOUND":
-			ofile.close()
-			os.remove(filename)
-			print data
-			break
-		elif data == "FILE FINISHED SENDING":
+		elif data == "EOF":
 			break
 		elif data:
-			# write the file
-			ofile.write(data)				
+			ofile.write(data)			
 		else:
 			continue
 	ofile.close()
@@ -167,8 +162,8 @@ def main(argv):
 			# disconnect from the server gracefully
 			# todo send FIN to server
 			try:
-				sock.clientClose()
-				#sock.close()
+				#sock.clientClose()
+				sock.close()
 			except:
 				disconnect = True
 				#CHANGE THIS BACK 	disconnect = False

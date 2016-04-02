@@ -40,6 +40,7 @@ class RTPSocket:
 		self.socket_addr = socket_addr
 		self.socket_host = socket_addr[0]
 		self.socket_port = socket_addr[1]
+		#self.sock.close()
 		self.sock.bind((self.socket_host, self.socket_port))
 
 	def accept(self):
@@ -134,7 +135,7 @@ class RTPSocket:
 
 
 	def send(self, data, addr):
-		print "Calling send with data:" + data + " and addr " + str(addr)
+		print "Calling send with data:" + data + " to addr " + str(addr)
 		"""
 		Sends data through a socket to an address
 		data: data to send to address
@@ -172,9 +173,7 @@ class RTPSocket:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
-		print "starting to send"
-
-		print len(self.packetList)
+		print "len of packet list is " + str(len(self.packetList))
 
 		self.base = 0 
 		self.nextseqnum = 0
@@ -184,7 +183,8 @@ class RTPSocket:
 				#if we do a pop, the index automatically changes, so just index the packet list
 				print self.nextseqnum
 				packetToSend = self.packetList[self.nextseqnum]
-				print "SND: " + str(packetToSend)
+				#print "SND: " + str(packetToSend)
+				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
@@ -208,7 +208,7 @@ class RTPSocket:
 				header = self.getPacket(response).header
 
 				if packet and header.ACK == 1 and header.dest_port == self.socket_port: ## and its not corrupt
-					print "GOT: " + str(packet)
+					#print "GOT: " + str(packet)
 					#responseHeader = packet.header
 					self.base = packet.header.acknum + 1
 					#print "self base :" + str(self.base)
@@ -257,7 +257,7 @@ class RTPSocket:
 					#if rcvpkt and header.source_port == self.dst_port:
 					if rcvpkt and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
-						print "RCV: " + str(rcvpkt)
+						#print "RCV: " + str(rcvpkt)
 						#rint expectedseqnum
 						# if packet with expected seqnum (in order) is received:
 						if rcvpkt.header.seqnum == expectedseqnum:
@@ -274,7 +274,7 @@ class RTPSocket:
 							#packets_received.append(rcvpkt)
 							#data_received += rcvpkt.data
 							# send an ACK for the packet and increment expectedseqnum
-							print "sending ACK for packet in recv"
+							#print "sending ACK for packet in recv"
 							seqnum = rcvpkt.header.acknum
 							acknum = rcvpkt.header.seqnum #+ 1
 							self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
@@ -284,7 +284,7 @@ class RTPSocket:
 						else:
 							#only re-send the ACK after we have sent one ACK
 							if last_acknum_sent != None:
-								print "re-sending ACK for packet in recv"
+								#print "re-sending ACK for packet in recv"
 								seqnum = rcvpkt.header.acknum
 								acknum = last_acknum_sent
 								self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
@@ -329,7 +329,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
-		print "ACK: " + str(packet)
+		#print "ACK: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
@@ -432,6 +432,10 @@ class RTPSocket:
 		print "Closing Connection"
 		self.rtpsocket.close()
 
+	def close(self):
+		self.sock.close()
+		print "Closed Connection"
+
 
 	def getPacket(self, bytes):
 		"""
@@ -467,7 +471,7 @@ class RTPPacket:
 	RTT: round trip time in seconds
 	"""
 
-	MSS = 1 #5 bytes
+	MSS = 500 #5 bytes
 	RTT = 2 # placeholder
 
 	def __init__(self, header, data=""):

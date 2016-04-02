@@ -47,9 +47,6 @@ def clientSession(conn, addr):
 				file2 = dataList[2]
 				# send the file (or error msg) to client
 				get_post(conn, addr, file1, file2)
-			else:
-				error_msg = "ERROR: COMMAND NOT RECOGNIZED"
-				sock.send(error_msg, (addr))
 				#sock.send(error_msg, (dest_host, dest_port))
 		else:
 			continue
@@ -137,12 +134,12 @@ def uploadFile(conn, addr, filename):
 		send_file = open(filename, "rb") #rb to read in binary mode
 	try:
 		# send file to client
-		msg = send_file.read(conn.rwnd) # read a portion of the file
-		while msg:
-			sock.send(msg, addr)
-			msg = send_file.read(conn.rwnd)
+		msg = send_file.read() # read a portion of the file
+		#while msg:
+		sock.send(msg, addr)
+		#	msg = send_file.read(conn.rwnd)
 		send_file.close() # close the file
-		sock.send("FILE FINISHED SENDING", addr)
+		sock.send("EOF", addr)
 		print "sent file to client"
 	except Exception, e:
 		if send_file:
@@ -224,7 +221,6 @@ def main(argv):
 		#		print "test"
 			conn, addr = sock.accept()
 			newthread = threading.Thread(target = clientSession, args = (conn, addr,))
-			
 			listenThread = threading.Thread(target = listen)
 			listenThread.start()
 			newthread.start()
@@ -289,6 +285,8 @@ def main(argv):
 		print "Error"
 		print e
 		raise # for debugging
+	finally:
+			sock.close()
  
 
 if __name__ == "__main__":
