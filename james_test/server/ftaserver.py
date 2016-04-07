@@ -48,6 +48,8 @@ def clientSession(conn, addr):
 				get_post(conn, addr, file1, file2)
 				break
 				#sock.send(error_msg, (dest_host, dest_port))
+			#ELSE INVALID COMMAND
+			#EDIT THIS
 		else:
 			continue
 
@@ -138,6 +140,7 @@ def uploadFile(conn, addr, filename):
 		# send file to client
 		msg = send_file.read() # read a portion of the file
 		#while msg:
+		print msg
 		sock.send(msg, addr)
 		#	msg = send_file.read(conn.rwnd)
 		send_file.close() # close the file
