@@ -7,8 +7,6 @@ import Queue
 sys.path.insert(0,'..')
 from rtp import *
 
-lock = threading.Lock()
-sock = None
 q = Queue.Queue()
 
 def test(host,port):
@@ -133,7 +131,6 @@ def main(argv):
 
 	disconnect = False
 
-	global sock
 	sock = RTPSocket()
 	sock.rwnd = rwnd
 
@@ -144,7 +141,6 @@ def main(argv):
 	#	conn = q.get()
 
 	conn = sock.connect((host,port))
-
 
 	while disconnect == False:
 		command = raw_input("> ")
