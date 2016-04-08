@@ -512,6 +512,31 @@ class RTPPacket:
 		return self.header.FIN == 1
 
 
+	# http://www.binarytides.com/raw-socket-programming-in-python-linux/
+	# http://locklessinc.com/articles/tcp_checksum/
+	def checksum(self):
+		"""Returns the checksum of a packet"""
+		pkt = self.makeBytes()
+		# calculate checksum on header + data
+		csum = 0 # initialize sum to 0
+		# if packet length is odd, add padding 0 at end
+		if len(pkt) % 2 == 1:
+			pkt += "\0"
+		# loop through characters 2 at a time and add all to csum
+		for i in range(0, len(pkt), 2):
+			csum += ord(pkt[i]) + (ord(pkt[i+1]) << 8)
+		# fold and invert
+		csum = (csum >> 16) + (csum & 0xFFFF)
+		csum = csum + (csum >> 16)
+		csum = ~csum & 0xFFFF
+
+
+	def setChecksum(self):
+	"""Sets the checksum field in the RTPPacket header"""
+		csum = self.checksum()
+		self.header.checksum = csum
+
+
 class RTPHeader:
 	"""Represents a header for an RTPPacket."""
 
