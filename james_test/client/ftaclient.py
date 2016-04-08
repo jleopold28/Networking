@@ -11,9 +11,6 @@ lock = threading.Lock()
 sock = None
 q = Queue.Queue()
 
-def listen():
-	sock.recv()
-
 def test(host,port):
 	conn = sock.connect((host, port))
 	q.put(conn)
@@ -73,9 +70,6 @@ def downloadFile(conn, filename):
 	print "DOWNLOADING FILE"
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
-
-	listenThread = threading.Thread(target = listen)
-	listenThread.start()
 
 	while 1:
 		# receive response from server

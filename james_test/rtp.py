@@ -32,9 +32,14 @@ class RTPSocket:
 	def __init__(self):
 		"""Constructs a new RTPConnection."""
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+		self.recvThread = threading.Thread(self.recv)
+		self.recvThread.start()
+
 		self.rwnd = None
 		self.N = 5
 		self.connections = {}
+		self.SYNqueue = []
 
 	def bind(self, socket_addr):
 		self.socket_addr = socket_addr
@@ -47,6 +52,14 @@ class RTPSocket:
 		"""Server side of 3 way handshake; accepts connection to client."""
 		 #"listen" for SYN from client
 		print "calling accept"
+		if len(self.SYNqueue) == 0:
+			return "no SYN bits received"
+		else:
+			synPacket = self.SYNqueue[0]
+			#send synack for this packet ....
+
+
+			
 		while 1:
 			data, dstaddr = self.sock.recvfrom(1024)
 			if data:
@@ -257,8 +270,10 @@ class RTPSocket:
 				if response:
 					rcvpkt = self.getPacket(response)
 					header = rcvpkt.header
+					if header.SYN == 1:
+						self.SYNqueue.append(rcvpkt) #add to the SYN queu
 					#if rcvpkt and header.source_port == self.dst_port:
-					if rcvpkt and header.dest_port == self.socket_port:
+					elif rcvpkt and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
 						print "RCV: " + str(rcvpkt)
 						#rint expectedseqnum

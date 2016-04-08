@@ -18,9 +18,6 @@ def test():
 	print addr
 	q.put((conn,addr))
 
-def listen():
-	sock.recv()
-
 def clientSession(conn, addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
 	#print connections[cid]
@@ -226,8 +223,6 @@ def main(argv):
 		#		print "test"
 			conn, addr = sock.accept()
 			newthread = threading.Thread(target = clientSession, args = (conn, addr,))
-			listenThread = threading.Thread(target = listen)
-			listenThread.start()
 			newthread.start()
 
 		#while 1:
