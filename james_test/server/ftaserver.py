@@ -7,8 +7,6 @@ import Queue
 sys.path.insert(0,'..')
 from rtp import *
 
-lock = threading.Lock()
-sock = None
 q = Queue.Queue()
 
 def test():
@@ -189,8 +187,6 @@ def main(argv):
 		#bind it to the server host and port
 		#sock.bind((host, port))
 
-		global sock
-		global lock
 		sock = RTPSocket()
 		sock.rwnd = rwnd
 		sock.bind((host, port))
@@ -210,7 +206,7 @@ def main(argv):
 		#test = threading.Thread(target = makeconnection)
 		#test.start()
 		while 1:
-			print "Waiting for incoming connections..."
+			#print "Waiting for incoming connections..."
 			#acceptThread = threading.Thread(target = test)
 
 			#with lock:
@@ -222,9 +218,11 @@ def main(argv):
 		#		print addr
 		#		print "test"
 			conn, addr = sock.accept()
-			newthread = threading.Thread(target = clientSession, args = (conn, addr,))
-			newthread.start()
+			if (conn, addr) != ("",""):
+				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
+				newthread.start()
 
+		sock.close()
 		#while 1:
 		#		print "Waiting for incoming connections..."
 			#conn, addr = sock.accept()
@@ -285,8 +283,7 @@ def main(argv):
 		print "Error"
 		print e
 		raise # for debugging
-	finally:
-			sock.close()
+		
  
 
 if __name__ == "__main__":

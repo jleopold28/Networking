@@ -17,6 +17,7 @@ class RTPConnection:
 		self.dst_addr = destination_address
 		self.dst_host = destination_address[0]
 		self.dst_port = destination_address[1]
+		self.isOff = True
 
 		self.data = ""
 
@@ -26,6 +27,8 @@ class RTPConnection:
 	def addData(self, data):
 		self.data += data
 
+	def start(self):
+		self.isOff = False
 
 class RTPSocket:
 	"""Represents a socket over RTP"""
@@ -33,13 +36,14 @@ class RTPSocket:
 		"""Constructs a new RTPConnection."""
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-		self.recvThread = threading.Thread(self.recv)
-		self.recvThread.start()
-
 		self.rwnd = None
 		self.N = 5
 		self.connections = {}
 		self.SYNqueue = []
+
+		self.recvThread = threading.Thread(target = self.recv)
+		self.recvThread.start()
+
 
 	def bind(self, socket_addr):
 		self.socket_addr = socket_addr
@@ -52,44 +56,46 @@ class RTPSocket:
 		"""Server side of 3 way handshake; accepts connection to client."""
 		 #"listen" for SYN from client
 		print "calling accept"
-		if len(self.SYNqueue) == 0:
-			return "no SYN bits received"
+
+		if len(self.SYNqueue) == 0: # no SYN bits recevied
+			return "",""
+			#return "no SYN bits received"
 		else:
-			synPacket = self.SYNqueue[0]
+			#get first SYN
+			synPacket, dstaddr = self.SYNqueue[0]
+
+			synPacket = self.getPacket(synPacket)
+			header = synPacket.header
+
 			#send synack for this packet ....
+			#we got a SYN bit so set up the connection with this client
+			self.server_isn = random.randint(0,1000)
+			acknum = header.seqnum + 1
+
+			print "sent SYNACK"
+			self.sendSYNACK(self.socket_port, dstaddr, self.server_isn, acknum)
+
+			print "Creating connection"
+			conn_id = random.randint(0,100000)
+			conn = RTPConnection(dstaddr, self.socket_port, self.rwnd)
+			self.connections[conn_id] = conn
+
+			#wait to recieve a response from the client
+			while conn.isOff:
+				pass
+
+			return conn, dstaddr
 
 
 			
-		while 1:
-			data, dstaddr = self.sock.recvfrom(1024)
-			if data:
-				header = self.getPacket(data).header
-				if header.SYN == 1:
-					print "recved SYN"
-					break
+		# while 1:
+		# 	data, dstaddr = self.sock.recvfrom(1024)
+		# 	if data:
+		# 		header = self.getPacket(data).header
+		# 		if header.SYN == 1:
+		# 			print "recved SYN"
+		# 			break
 
-		#we got a SYN bit so set up the connection with this client
-		server_isn = random.randint(0,1000)
-		acknum = header.seqnum + 1
-
-		print "sent SYNACK"
-		self.sendSYNACK(self.socket_port, dstaddr, server_isn, acknum)
-
-		#wait to recieve a response from the client
-		while 1:
-			data, fromaddr = self.sock.recvfrom(1000)
-			if data and fromaddr == dstaddr: #only if this is the ACK from the same host and port as above
-				header = self.getPacket(data).header
-				#print "Received ACK with seqnum = " + str(header.seqnum) + ", acknum = " + str(header.acknum)
-				#print "Expected: " + str(client_isn + 1) + ", " + str(server_isn + 1)
-				if header.seqnum == (acknum) and header.acknum == (server_isn + 1) and header.ACK == 1 and header.SYN == 0:
-					break
-
-		print "Creating connection"
-		conn_id = random.randint(0,100000)
-		conn = RTPConnection(dstaddr, self.socket_port, self.rwnd)
-		self.connections[conn_id] = conn
-		return conn, dstaddr
 
 
 	def connect(self, destination_address):
@@ -271,8 +277,12 @@ class RTPSocket:
 					rcvpkt = self.getPacket(response)
 					header = rcvpkt.header
 					if header.SYN == 1:
-						self.SYNqueue.append(rcvpkt) #add to the SYN queu
+						self.SYNqueue.append((response, rcv_address)) #add to the SYN queu
 					#if rcvpkt and header.source_port == self.dst_port:
+					elif header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):
+						for c in self.connections:
+							if self.connections[c].dst_addr == rcv_address:
+									self.connections[c].start()
 					elif rcvpkt and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
 						print "RCV: " + str(rcvpkt)
