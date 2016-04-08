@@ -151,7 +151,7 @@ class RTPSocket:
 			else:
 				dataSegments.append(data[segment:segment+RTPPacket.MSS]) 	#	append segment
 
-		self.packetList = [] #this is our send buffer
+		self.packetList = []#this is our send buffer
 
 		seqnum = 0 #initialize to 0
 		for d in range(len(dataSegments)):
@@ -170,6 +170,8 @@ class RTPSocket:
 			else:
 				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 0)
 			packet = RTPPacket(header, dataSegments[d])
+
+			#self.packetList[i] = packet
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
@@ -181,9 +183,9 @@ class RTPSocket:
 		while ackLastPacket == False:
 			if(self.nextseqnum < self.base + self.N):
 				#if we do a pop, the index automatically changes, so just index the packet list
-				#print self.nextseqnum
+				print self.nextseqnum
 				packetToSend = self.packetList[self.nextseqnum]
-				#print "SND: " + str(packetToSend)
+				print "SND: " + str(packetToSend)
 				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
@@ -202,26 +204,27 @@ class RTPSocket:
 			#print packet
 			#print header.ACK == 1
 			#rint header.dest_port == self.socket_port
-			response, dstaddr = self.sock.recvfrom(1000)
-			if response:
-				packet = self.getPacket(response)
-				header = self.getPacket(response).header
+			else:	
+				response, dstaddr = self.sock.recvfrom(1000)
+				if response:
+					packet = self.getPacket(response)
+					header = self.getPacket(response).header
 
-				if packet and header.ACK == 1 and header.dest_port == self.socket_port: ## and its not corrupt
-					#print "GOT: " + str(packet)
-					#responseHeader = packet.header
-					self.base = packet.header.acknum + 1
-					#print "self base :" + str(self.base)
-					for i in range(0, self.base): #cumulative ACK
-						self.packetList[i].isACKED = True
-					if(self.base == self.nextseqnum):
-						t.cancel()
-					else:
-						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-						t.start()
+					if packet and header.ACK == 1 and header.dest_port == self.socket_port: ## and its not corrupt
+						print "GOT: " + str(packet)
+						#responseHeader = packet.header
+						self.base = packet.header.acknum + 1
+						#print "self base :" + str(self.base)
+						for i in range(0, self.base): #cumulative ACK
+							self.packetList[i].isACKED = True
+						if(self.base == self.nextseqnum):
+							t.cancel()
+						else:
+							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+							t.start()
 
-			if self.packetList[-1].isACKED:
-				ackLastPacket = True
+				if self.packetList[-1].isACKED:
+					ackLastPacket = True
 
 	def timeout(self, addr):
 		""" 
@@ -257,7 +260,7 @@ class RTPSocket:
 					#if rcvpkt and header.source_port == self.dst_port:
 					if rcvpkt and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
-						#print "RCV: " + str(rcvpkt)
+						print "RCV: " + str(rcvpkt)
 						#rint expectedseqnum
 						# if packet with expected seqnum (in order) is received:
 						if rcvpkt.header.seqnum == expectedseqnum:
@@ -276,9 +279,10 @@ class RTPSocket:
 							# send an ACK for the packet and increment expectedseqnum
 							#print "sending ACK for packet in recv"
 							seqnum = rcvpkt.header.acknum
-							acknum = rcvpkt.header.seqnum #+ 1
+							acknum = rcvpkt.header.seqnum + 1
 							self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
-							expectedseqnum = expectedseqnum + 1
+							#expectedseqnum = expectedseqnum + 1
+							expectedseqnum = acknum
 							last_acknum_sent = acknum
 						# else: re-send ACK for most recently received in-order packet
 						else:
@@ -532,7 +536,7 @@ class RTPPacket:
 
 
 	def setChecksum(self):
-	"""Sets the checksum field in the RTPPacket header"""
+		"""Sets the checksum field in the RTPPacket header"""
 		csum = self.checksum()
 		self.header.checksum = csum
 
