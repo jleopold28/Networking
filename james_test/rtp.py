@@ -305,7 +305,7 @@ class RTPSocket:
 				with self.lock:
 					response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 				if response:
-<<<<<<< HEAD
+#<<<<<<< HEAD
 					print "received a response from " + str(rcv_address)
 					response = self.getPacket(response)
 					header = response.header
