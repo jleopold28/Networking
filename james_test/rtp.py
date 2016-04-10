@@ -78,7 +78,7 @@ class RTPSocket:
 			#print "sent SYNACK to " + str(dstaddr)
 
 			self.sendSYNACK(self.socket_port, dstaddr, self.server_isn, acknum)
-			print "sent SYNACK to " + str(dstaddr)
+			#print "sent SYNACK to " + str(dstaddr)
 
 
 			# accept is server side so I think we need to create the connection object at the client address
@@ -86,7 +86,6 @@ class RTPSocket:
 			conn_id = dstaddr[1] # now identify by the client port! #random.randint(0,100000)
 			conn = RTPConnection(dstaddr, self.socket_port, self.rwnd)
 			self.connections[conn_id] = conn
-			print self.connections
 
 			#wait to recieve a response from the client
 #<<<<<<< HEAD
@@ -99,7 +98,7 @@ class RTPSocket:
 				if conn.isOff == False:
 					break
 			
-			print "CONNECTION IS ON"
+			#print "CONNECTION IS ON"
 #>>>>>>> 9714de190a7dc92b1b501a4785c192ec4d5f5646
 			return conn, dstaddr
 			
@@ -140,7 +139,7 @@ class RTPSocket:
 		print "sent SYN to " + str(destination_address) + ", waiting for SYNACK"
 		#wait to recieve a SYNACK from the server
 		self.recvThread.start() # NEW
-		print "waiting for SYNACK queue"
+		#print "waiting for SYNACK queue"
 		while 1:
 			if len(self.SYNACKqueue) == 0: # no SYN bits recevied
 				continue
@@ -179,13 +178,13 @@ class RTPSocket:
 		conn_id = header.dest_port #destination_address #(self.socket_host, self.socket_port)
 		#self.connections[conn_id] = conn
 		#conn.isOff = False
-		conn.start()
+		conn.startConn()
 		print "returning RTP connection at " + str(conn_id)
 		return conn
 
 
 	def send(self, data, addr):
-		#print "Calling send with data:" + data + " to addr " + str(addr)
+		print "Calling send with data:" + data + " to addr " + str(addr)
 		"""
 		Sends data through a socket to an address
 		data: data to send to address
@@ -225,7 +224,7 @@ class RTPSocket:
 			seqnum = seqnum + 1
 
 		#print "len of packet list is " + str(len(self.packetList))
-
+		print "PacketList: " + str(self.packetList)
 		self.base = 0 
 		self.nextseqnum = 0
 		ackLastPacket = False
@@ -305,32 +304,23 @@ class RTPSocket:
 				with self.lock:
 					response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 				if response:
-#<<<<<<< HEAD
-					print "received a response from " + str(rcv_address)
-					response = self.getPacket(response)
-					header = response.header
-					print header
-#=======
-#					rcvpkt = self.getPacket(response)
-#					header = rcvpkt.header
-#					print "RCV: " + str(rcvpkt)
-#>>>>>>> 9714de190a7dc92b1b501a4785c192ec4d5f5646
+					rcvkpt = self.getPacket(response)
+					header = rcvkpt.header
+
 					if header.ACK == 0 and header.SYN == 1: #just SNY
-						print "GOT SYN"
-						self.SYNqueue.append((response, rcv_address)) #add to the SYN queu
+						self.SYNqueue.append((rcvkpt, rcv_address)) #add to the SYN queu
 #<<<<<<< HEAD
 						continue
 					#if rcvpkt and header.source_port == self.dst_port:
 					elif header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
 						print "starting connection at " + str(rcv_address)
-						self.connections[rcv_address[1]].start()
+						self.connections[rcv_address[1]].startConn()
 					elif header.ACK == 1 and header.SYN == 1:  #GIT SYNACK
-						print "GOT SYNACK"
-						self.SYNACKqueue.append((response, rcv_address))
+						self.SYNACKqueue.append((rcvkpt, rcv_address))
 						return
-					elif response and header.dest_port == self.socket_port:
+					elif rcvkpt and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
-						print "RCV: " + str(response)
+						print "RCV: " + str(rcvkpt)
 #=======
 						end_of_message = True
 #					#if rcvpkt and header.source_port == self.dst_port:
@@ -355,20 +345,20 @@ class RTPSocket:
 #>>>>>>> 9714de190a7dc92b1b501a4785c192ec4d5f5646
 						#rint expectedseqnum
 						# if packet with expected seqnum (in order) is received:
-						if response.header.seqnum == expectedseqnum:
+						if rcvkpt.header.seqnum == expectedseqnum:
 							# set end_of_message = True if eom = 1 in packet header
-							if response.header.eom == 1:
+							if rcvkpt.header.eom == 1:
 								end_of_message = True
 							# extract data - add onto string
-							self.connections[rcv_port].addData(response.data)
+							self.connections[rcv_port].addData(rcvkpt.data)
 							#data_buffer += rcvpkt.data
 
 							#packets_received.append(rcvpkt)
 							#data_received += rcvpkt.data
 							# send an ACK for the packet and increment expectedseqnum
 							#print "sending ACK for packet in recv"
-							seqnum = response.header.acknum
-							acknum = response.header.seqnum + 1
+							seqnum = rcvkpt.header.acknum
+							acknum = rcvkpt.header.seqnum + 1
 							self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
 							#expectedseqnum = expectedseqnum + 1
 							expectedseqnum = acknum
@@ -378,7 +368,7 @@ class RTPSocket:
 							#only re-send the ACK after we have sent one ACK
 							if last_acknum_sent != None:
 								#print "re-sending ACK for packet in recv"
-								seqnum = response.header.acknum
+								seqnum = rcvkpt.header.acknum
 								acknum = last_acknum_sent
 								self.sendACK(self.socket_port, rcv_address, seqnum, acknum)
 								# if end_of_message was found, set it back to False 
@@ -441,7 +431,6 @@ class RTPSocket:
 	
 		#print packet
 		#print "SYNACK: "+ str(packet)
-		print "Sending SYNACK to port " + str(dstport)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 

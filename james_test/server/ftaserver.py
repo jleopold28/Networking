@@ -221,7 +221,7 @@ def main(argv):
 			if (conn, addr) != ("",""):
 				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
 				newthread.start()
-				print "new thread started"
+				#print "new thread started"
 
 		sock.close()
 		#while 1:
