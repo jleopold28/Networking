@@ -50,7 +50,7 @@ def get_post(sock, conn, file1, file2, host, port):
 	#downloadFile(file1, sock, host, port, rwnd)
 	#uploadFile(file2, sock, host, port, rwnd)
 
-def get(conn, filename, host, port):
+def get(sock, conn, filename, host, port):
 	"""Downloads file from server."""
 	# send filename to server
 
@@ -179,7 +179,7 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(conn, f, host, port)
+				get(sock, conn, f, host, port)
 			except:
 				print "Error downloading file."
 				raise # for debugging
