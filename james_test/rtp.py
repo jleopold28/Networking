@@ -27,7 +27,7 @@ class RTPConnection:
 	def addData(self, data):
 		self.data += data
 
-	def start(self):
+	def startConn(self):
 		self.isOff = False
 
 class RTPSocket:
@@ -74,9 +74,9 @@ class RTPSocket:
 			self.server_isn = random.randint(0,1000)
 			acknum = header.seqnum + 1
 
-			
-
 			#self.sendSYNACK(self.socket_port, dstaddr, self.server_isn, acknum)
+			#print "sent SYNACK to " + str(dstaddr)
+
 			self.sendSYNACK(self.socket_port, dstaddr, self.server_isn, acknum)
 			print "sent SYNACK to " + str(dstaddr)
 
@@ -89,13 +89,19 @@ class RTPSocket:
 			print self.connections
 
 			#wait to recieve a response from the client
-			print "connection is off"
-			while conn.isOff:
-				pass
+#<<<<<<< HEAD
+#			print "connection is off"
+#			while conn.isOff:
+#				pass
 
+#=======
+			while True:
+				if conn.isOff == False:
+					break
+			
+			print "CONNECTION IS ON"
+#>>>>>>> 9714de190a7dc92b1b501a4785c192ec4d5f5646
 			return conn, dstaddr
-
-
 			
 		# while 1:
 		# 	data, dstaddr = self.sock.recvfrom(1024)
@@ -299,12 +305,20 @@ class RTPSocket:
 				with self.lock:
 					response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 				if response:
+<<<<<<< HEAD
 					print "received a response from " + str(rcv_address)
 					response = self.getPacket(response)
 					header = response.header
 					print header
+#=======
+#					rcvpkt = self.getPacket(response)
+#					header = rcvpkt.header
+#					print "RCV: " + str(rcvpkt)
+#>>>>>>> 9714de190a7dc92b1b501a4785c192ec4d5f5646
 					if header.ACK == 0 and header.SYN == 1: #just SNY
+						print "GOT SYN"
 						self.SYNqueue.append((response, rcv_address)) #add to the SYN queu
+#<<<<<<< HEAD
 						continue
 					#if rcvpkt and header.source_port == self.dst_port:
 					elif header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
@@ -317,6 +331,28 @@ class RTPSocket:
 					elif response and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
 						print "RCV: " + str(response)
+#=======
+						end_of_message = True
+#					#if rcvpkt and header.source_port == self.dst_port:
+#					elif header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
+#						print "GOT ACK FOR CONN START"
+#						for c in self.connections:
+#							if self.connections[c].dst_addr == rcv_address:
+#									b = self.connections[c]
+#									print b
+#									b.startConn()
+#						end_of_message = True
+#
+#					elif header.ACK == 1 and header.SYN == 1:  #GIT SYNACK
+#						print "GOT SYNACK"
+#						#print "GOT SYN ACK: " + str(rcvpkt)
+#						self.SYNACKqueue.append((response, rcv_address))
+#						end_of_message = True
+#
+#					elif rcvpkt and header.dest_port == self.socket_port:
+#						rcv_port = rcv_address[1]
+#						#print "RCV: " + str(rcvpkt)
+#>>>>>>> 9714de190a7dc92b1b501a4785c192ec4d5f5646
 						#rint expectedseqnum
 						# if packet with expected seqnum (in order) is received:
 						if response.header.seqnum == expectedseqnum:
