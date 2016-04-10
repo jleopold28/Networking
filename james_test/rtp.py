@@ -27,7 +27,7 @@ class RTPConnection:
 	def addData(self, data):
 		self.data += data
 
-	def start(self):
+	def startConn(self):
 		self.isOff = False
 
 class RTPSocket:
@@ -57,7 +57,7 @@ class RTPSocket:
 	def accept(self):
 		"""Server side of 3 way handshake; accepts connection to client."""
 		 #"listen" for SYN from client
-		print "calling accept"
+		#print "calling accept"
 
 		if len(self.SYNqueue) == 0: # no SYN bits recevied
 			return "",""
@@ -74,7 +74,7 @@ class RTPSocket:
 			self.server_isn = random.randint(0,1000)
 			acknum = header.seqnum + 1
 
-			print "sent SYNACK"
+			#print "sent SYNACK to " + str(dstaddr)
 			self.sendSYNACK(self.socket_port, dstaddr, self.server_isn, acknum)
 
 			print "Creating connection"
@@ -83,12 +83,12 @@ class RTPSocket:
 			self.connections[conn_id] = conn
 
 			#wait to recieve a response from the client
-			while conn.isOff:
-				pass
-
+			while True:
+				if conn.isOff == False:
+					break
+			
+			print "CONNECTION IS ON"
 			return conn, dstaddr
-
-
 			
 		# while 1:
 		# 	data, dstaddr = self.sock.recvfrom(1024)
@@ -294,19 +294,30 @@ class RTPSocket:
 				if response:
 					rcvpkt = self.getPacket(response)
 					header = rcvpkt.header
+					print "RCV: " + str(rcvpkt)
 					if header.ACK == 0 and header.SYN == 1: #just SNY
+						print "GOT SYN"
 						self.SYNqueue.append((response, rcv_address)) #add to the SYN queu
+						end_of_message = True
 					#if rcvpkt and header.source_port == self.dst_port:
 					elif header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
+						print "GOT ACK FOR CONN START"
 						for c in self.connections:
 							if self.connections[c].dst_addr == rcv_address:
-									self.connections[c].start()
+									b = self.connections[c]
+									print b
+									b.startConn()
+						end_of_message = True
 
 					elif header.ACK == 1 and header.SYN == 1:  #GIT SYNACK
+						print "GOT SYNACK"
+						#print "GOT SYN ACK: " + str(rcvpkt)
 						self.SYNACKqueue.append((response, rcv_address))
+						end_of_message = True
+
 					elif rcvpkt and header.dest_port == self.socket_port:
 						rcv_port = rcv_address[1]
-						print "RCV: " + str(rcvpkt)
+						#print "RCV: " + str(rcvpkt)
 						#rint expectedseqnum
 						# if packet with expected seqnum (in order) is received:
 						if rcvpkt.header.seqnum == expectedseqnum:
