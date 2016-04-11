@@ -146,7 +146,7 @@ class RTPSocket:
 
 
 	def send(self, data, addr):
-		print "Calling send with data:" + data + " to addr " + str(addr)
+		#print "Calling send with data:" + data + " to addr " + str(addr)
 		"""
 		Sends data through a socket to an address
 		data: data to send to address
@@ -188,50 +188,50 @@ class RTPSocket:
 		#print "len of packet list is " + str(len(self.packetList))
 		#print "PacketList: " + str(self.packetList)
 
+		print "LEN OF PACKET LIST: " + str(len(self.packetList))
+
 		self.base = 0 
 		self.nextseqnum = 0
 		ackLastPacket = False
 		a = True
-
 		while ackLastPacket == False:
-			if len(self.packetList) == 1 and a:    #sending only one message:
-				packetToSend = self.packetList[0]
-				self.sock.sendto(packetToSend.makeBytes(), addr)
-				if(self.base == self.nextseqnum):
-					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-					t.start()
-				#only send it once
-				a = False
-			elif len(self.packetList) > 1 and self.nextseqnum < self.base + self.N:
-				#if we do a pop, the index automatically changes, so just index the packet list
-				packetToSend = self.packetList[self.nextseqnum]
-				#print "SND: " + str(packetToSend)
-				#raw_input("press to send")
-				self.sock.sendto(packetToSend.makeBytes(), addr)
-				if(self.base == self.nextseqnum):
-					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-					t.start()
-				self.nextseqnum += 1
-			else:
-				with self.lock:
-					response, dstaddr = self.sock.recvfrom(1000)
-				if response:
-					packet = self.getPacket(response)
-					header = packet.header
+			if len(self.packetList) < self.N :   #sending message smaller than RWND --> send the whole thing
+				print "SENDING MESSAGE SMALLER THAN RWND"
+				for i in range(0, len(self.packetList)):
+					packetToSend = self.packetList[i]
+					self.sock.sendto(packetToSend.makeBytes(), addr)
+					if(self.base == self.nextseqnum):
+						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+						t.start()
+					self.nextseqnum += 1
+			else: #packer list is larger than N
+				while (self.nextseqnum < self.base + self.N):		
+					packetToSend = self.packetList[self.nextseqnum]
+					#print "SND: " + str(packetToSend)
+					#raw_input("press to send")
+					self.sock.sendto(packetToSend.makeBytes(), addr)
+					if(self.base == self.nextseqnum):
+						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+						t.start()
+					self.nextseqnum += 1
 
-					if packet and header.ACK == 1 and header.dest_port == self.socket_port: ## and its not corrupt
-						print "GOT ACK FOR: " + str(packet)
-						#responseHeader = packet.header
-						self.base = packet.header.acknum + 1
-						#print "self base :" + str(self.base)
-						for i in range(0, self.base): #cumulative ACK
-							self.packetList[i].isACKED = True
-						if(self.base == self.nextseqnum):
-							t.cancel()
-						else:
-							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-							t.start()
-
+			with self.lock:
+				response, dstaddr = self.sock.recvfrom(1000)
+			if response:
+				packet = self.getPacket(response)
+				header = packet.header
+				if packet and header.ACK == 1: ## and its not corrupt
+					print "GOT ACK FOR: " + str(packet)
+					#responseHeader = packet.header
+					self.base = packet.header.acknum + 1
+					print "base: " + str(self.base)
+					for i in range(0, self.base): #cumulative ACK
+						self.packetList[i].isACKED = True
+					if(self.base == self.nextseqnum):
+						t.cancel()
+					else:
+						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+						t.start()
 			if self.packetList[-1].isACKED:
 				ackLastPacket = True
 
@@ -241,6 +241,7 @@ class RTPSocket:
 		Retransmits packets from base to nextseqnum-1
 		addr: tuple (host, port)
 		"""
+		print "TIMEOUT"
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
@@ -272,7 +273,7 @@ class RTPSocket:
 					elif header.ACK == 1 and header.SYN == 1:  #GIT SYNACK
 						self.SYNACKqueue.append((rcvpkt, rcv_address))
 						break #continue
-					elif rcvpkt and header.dest_port == self.socket_port:
+					elif rcvpkt and header.ACK == 0: #we got data
 						rcv_port = rcv_address[1]
 						#print "RCV: " + str(rcvpkt)
 

@@ -7,30 +7,6 @@ import Queue
 sys.path.insert(0,'..')
 from rtp import *
 
-q = Queue.Queue()
-
-def test(host,port):
-	conn = sock.connect((host, port))
-	q.put(conn)
-
-def connect(sock, host, port, rwnd):
-	"""Creates a reliable connection with the FTA server and returns an RTPSocket."""
-	try:
-		conn = RTPConnection(rwnd, 0)
-		conn.connect(sock, (host, port))
-		print conn
-		#global sock
-		#sock = RTPSocket()
-		#sock.rwnd = rwnd
-		#sock.connect((host,port))
-		print "Connected"
-		return conn
-	except:
-		print('Error: Unable to connect to server.')
-		raise
-		sys.exit(1)
-		
-
 def get_post(sock, conn, file1, file2, host, port):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	command = "GET-POST"
