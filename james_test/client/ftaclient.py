@@ -52,11 +52,7 @@ def get_post(sock, conn, file1, file2, host, port):
 
 def get(sock, conn, filename, host, port):
 	"""Downloads file from server."""
-	# send filename to server
-
-	#sock.send("GET:" + filename, addr)
-	sock.send("GET:" + filename, (host,port))
-	#sock.send(command + ":" + filename, (dsthost, dstport)) #tell the server what operation we are doing
+	sock.send("GET:" + filename, (host,port)) #tell the server what operation we are doing
 	downloadFile(conn, filename)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
 	#having the method in a thread cant hurt
@@ -134,12 +130,6 @@ def main(argv):
 	sock = RTPSocket()
 	sock.rwnd = rwnd
 
-	#connectThread = threading.Thread(target = test, args = (host,port,))
-
-	#with lock:
-	#	connectThread.start()
-	#	conn = q.get()
-
 	conn = sock.connect((host,port))
 
 	while disconnect == False:
@@ -166,7 +156,7 @@ def main(argv):
 			f = cmd_list[1]
 			g = cmd_list[2]
 			try:
-				get_post(conn, f, g, host, port)
+				get_post(sock, conn, f, g, host, port)
 			except:
 				print "Error downloading or uploading file."
 
