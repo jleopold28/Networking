@@ -28,6 +28,8 @@ def get_post(sock, conn, file1, file2, host, port):
 
 def get(sock, conn, filename, host, port):
 	"""Downloads file from server."""
+
+	print "GET:"+filename
 	sock.send("GET:" + filename, (host,port)) #tell the server what operation we are doing
 	downloadFile(conn, filename)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
@@ -37,7 +39,7 @@ def get(sock, conn, filename, host, port):
 	#get_thread.join()
 
 def downloadFile(conn, filename):
-	print "DOWNLOADING FILE"
+	#print "DOWNLOADING FILE"
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 

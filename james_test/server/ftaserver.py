@@ -22,16 +22,12 @@ def clientSession(conn, addr):
 				filename = dataList[1]
 				# send the file (or error msg) to client
 				get(conn, addr, filename)
-				break
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
 				# send the file (or error msg) to client
 				get_post(conn, addr, file1, file2)
-				break
 				#sock.send(error_msg, (dest_host, dest_port))
-		else:
-			continue
 
 def get_post(file1, file2, host, port):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
@@ -61,11 +57,11 @@ def get(conn, addr, filename):
 	uploadFile(conn, addr, filename)
 
 def uploadFile(conn, addr, filename):
-	print "UPLOADING FILE"
+	#print "UPLOADING FILE"
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
-	print files
+	#print files
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
 		sock.send(error_msg, addr)
@@ -79,7 +75,7 @@ def uploadFile(conn, addr, filename):
 		sock.send(msg, addr)
 		send_file.close()      # close the file
 		sock.send("EOF", addr)
-		print "sent file to client"
+		print "Sent file to client"
 	except Exception, e:
 		if send_file:
 			send_file.close() # make sure file is closed

@@ -68,7 +68,7 @@ class RTPSocket:
 		self.socket_host = socket_addr[0]
 		self.socket_port = socket_addr[1]
 		self.sock.bind(self.socket_addr)
-		print "starting recv thread"
+		#print "starting recv thread"
 		self.recvThread.start()
 
 	def accept(self):
@@ -100,8 +100,8 @@ class RTPSocket:
 				if conn.isOff == False:
 					break
 			
-			print "CONNECTION IS ON"
-			print "Socket address:" + str(self.socket_addr)
+			#print "CONNECTION IS ON"
+			#print "Socket address:" + str(self.socket_addr)
 			return conn, dstaddr
 
 
@@ -121,7 +121,7 @@ class RTPSocket:
 		#print "Sending SYN Packet with seqnum = " + str(client_isn)
 		self.sendSYN(self.socket_port, destination_address, client_isn)
 
-		print "sent SYN to " + str(destination_address) + ", waiting for SYNACK"
+		#print "sent SYN to " + str(destination_address) + ", waiting for SYNACK"
 
 		self.recvThread.start() # NEW
 		#print "waiting for SYNACK queue"
@@ -134,13 +134,13 @@ class RTPSocket:
 				#sys.exit(1)
 				break
 
-		print "SYNACK received"
+		#print "SYNACK received"
 		
 		self.socket_host = ""
 		self.socket_port = header.dest_port
 		self.socket_addr = (self.socket_host, self.socket_port)
 
-		print "Socket address:" + str(self.socket_addr)
+		#print "Socket address:" + str(self.socket_addr)
 
 		#self.sock.bind(self.socket_addr) # removed bc I don't think we need to bind on the client side?
 
@@ -156,7 +156,7 @@ class RTPSocket:
 		conn_id = destination_address[1] 
 		self.connections[conn_id] = conn
 		conn.startConn()
-		print "returning RTP connection at " + str(conn_id)
+		#print "returning RTP connection at " + str(conn_id)
 		return conn
 
 
@@ -233,7 +233,7 @@ class RTPSocket:
 				break
 
 		t.cancel()
-		print "FINISHED SENDING MESSAGE"
+		#print "FINISHED SENDING MESSAGE"
 
 	def timeout(self, addr):
 		""" 
@@ -265,7 +265,7 @@ class RTPSocket:
 					self.SYNACKqueue.append((rcvpkt, rcv_address))
 					continue
 				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
-					print "starting connection at " + str(rcv_address)
+					#print "starting connection at " + str(rcv_address)
 					with self.lock:
 						self.connections[rcv_address[1]].startConn()
 					self.server_isn = None
