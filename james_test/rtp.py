@@ -243,7 +243,7 @@ class RTPSocket:
 
 			try:
 				while 1:
-					while (self.nextseqnum < self.base + self.N):		
+					while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
 						packetToSend = self.packetList[self.nextseqnum]
 						#print "SND: " + str(packetToSend)
 						#raw_input("press to send")
@@ -278,7 +278,7 @@ class RTPSocket:
 				print inst.args
 				print inst
 				print "FdSAF"
-				exit(1)
+				sys.exit(1)
 
 		t.cancel()
 		print "FINISHED SENDING MESSAGE"
@@ -340,7 +340,7 @@ class RTPSocket:
 						last_acknum_sent = expectedseqnum
 
 						if rcvpkt.header.eom == 1:
-							expectedseqnum = 0
+							expectedseqnum = 0	
 						else:
 							expectedseqnum += 1
 					# else: re-send ACK for most recently received in-order packet
