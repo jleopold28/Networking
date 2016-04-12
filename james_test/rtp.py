@@ -31,8 +31,15 @@ class RTPConnection:
 	def startConn(self):
 		self.isOff = False
 
+	def foo(self):
+		if len(self.ackList) == 0:
+			return False
+		else:
+			return True
+
 	def getACK(self):
-		return self.ackList.pop(0)
+		a = self.ackList.pop(0) #remove the first element
+		return a
 
 	def addACK(self, p):
 		self.ackList.append(p)
@@ -211,20 +218,21 @@ class RTPSocket:
 				self.nextseqnum += 1
 			while 1:
 				with self.lock:
-					if len(self.connections[addr[1]].ackList) != 0:
+					if self.connections[addr[1]].foo():
 						packet = self.connections[addr[1]].getACK()
 						header = packet.header
 
-						print "GOT ACK FOR: " + str(packet)
+						#print "GOT ACK FOR: " + str(packet)
 						#responseHeader = packet.header
 						self.base = header.acknum + 1
-						print "base: " + str(self.base)
-						print "nsn: " + str(self.nextseqnum)
+						#print "base: " + str(self.base)
+						#print "nsn: " + str(self.nextseqnum)
 						for i in range(0, self.base): #cumulative ACK
 							self.packetList[i].isACKED = True
 						if(self.base == self.nextseqnum):
 							t.cancel()
 						else:
+							t.cancel()
 							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 							t.start()
 
@@ -244,11 +252,11 @@ class RTPSocket:
 					self.nextseqnum += 1
 
 				with self.lock:
-					if len(self.connections[addr[1]].ackList) != 0:
+					if self.connections[addr[1]].foo():
 						packet = self.connections[addr[1]].getACK()
 						header = packet.header
 
-						print "NN GOT ACK FOR: " + str(packet)
+						print "GOT ACK FOR: " + str(packet)
 						#responseHeader = packet.header
 						self.base = header.acknum + 1
 						print "base: " + str(self.base)
@@ -258,6 +266,7 @@ class RTPSocket:
 						if(self.base == self.nextseqnum):
 							t.cancel()
 						else:
+							t.cancel()
 							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 							t.start()
 
@@ -279,15 +288,16 @@ class RTPSocket:
 
 	def recv(self):
 		"""Receives data at a socket and returns data, address."""
-		while True:
-			expectedseqnum = 0
-			last_acknum_sent = None
 
+		expectedseqnum = 0
+		last_acknum_sent = None
+
+		while True:
 			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 			if response:
 				rcvpkt = self.getPacket(response)
 				header = rcvpkt.header
-
+				#print "RCV: " + str(rcvpkt)
 				if header.ACK == 0 and header.SYN == 1: #SYN
 					self.SYNqueue.append((rcvpkt, rcv_address)) #add to the SYN queue
 					continue
@@ -301,7 +311,7 @@ class RTPSocket:
 					self.server_isn = None
 					continue
 				elif rcvpkt and header.ACK == 1: #we got an ACK
-					print "GOT ACK"
+					#print "GOT ACK"
 					with self.lock:
 						self.connections[rcv_address[1]].addACK(rcvpkt)
 					continue
@@ -311,24 +321,26 @@ class RTPSocket:
 					#print "seqnum received: " + str(rcvpkt.header.seqnum)
 					#print "seqnum expected: " + str(expectedseqnum)
 					if rcvpkt.header.seqnum == expectedseqnum:
-						#if rcvpkt.header.eom == 1:
-						#	end_of_message = True
 						self.connections[rcv_port].addData(rcvpkt.data)
 						#print "sending ACK for packet in recv"
-						seqnum = 300
+						seqnum = rcvpkt.header.acknum
 
 						self.sendACK(self.socket_port, rcv_address, seqnum, expectedseqnum)
 						last_acknum_sent = expectedseqnum
-						expectedseqnum += 1
+
+						if rcvpkt.header.eom == 1:
+							expectedseqnum = 0
+						else:
+							expectedseqnum += 1
 					# else: re-send ACK for most recently received in-order packet
-			else:
-				#only re-send the ACK after we have sent one ACK
-				if last_acknum_sent != None:
-					#print "re-sending ACK for packet in recv"
-					seqnum = 300
-					self.sendACK(self.socket_port, rcv_address, seqnum, last_acknum_sent)
-					# if end_of_message was found, set it back to False 
-					#end_of_message = False
+					else:
+						#only re-send the ACK after we have sent one ACK
+						if last_acknum_sent != None:
+							#print "re-sending ACK for packet in recv"
+							seqnum = rcvpkt.header.acknum
+							self.sendACK(self.socket_port, rcv_address, seqnum, last_acknum_sent)
+							# if end_of_message was found, set it back to False 
+							#end_of_message = False
 
 
 	def sendSYN(self, srcport, dstaddr, seqnum):
