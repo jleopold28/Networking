@@ -31,6 +31,12 @@ class RTPConnection:
 	def startConn(self):
 		self.isOff = False
 
+	def getACK(self):
+		return self.ackList.pop(0)
+
+	def addACK(self, p):
+		self.ackList.append(p)
+
 
 class RTPSocket:
 	"""Represents a socket over RTP"""
@@ -194,26 +200,39 @@ class RTPSocket:
 
 		self.base = 0 
 		self.nextseqnum = 0
-		ackLastPacket = False
-		#c is connection we are connectino to
+		if len(self.packetList) < self.N :   #sending message smaller than RWND --> send the whole thing
+			print "SENDING MESSAGE SMALLER THAN RWND"
+			for i in range(0, len(self.packetList)):
+				packetToSend = self.packetList[i]
+				self.sock.sendto(packetToSend.makeBytes(), addr)
+				if(self.base == self.nextseqnum):
+					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+					t.start()
+				self.nextseqnum += 1
+			while 1:
+				with self.lock:
+					if len(self.connections[addr[1]].ackList) != 0:
+						packet = self.connections[addr[1]].getACK()
+						header = packet.header
 
-		while ackLastPacket == False:
-			if len(self.packetList) < self.N :   #sending message smaller than RWND --> send the whole thing
-				#print "SENDING MESSAGE SMALLER THAN RWND"
-				for i in range(0, len(self.packetList)):
-					packetToSend = self.packetList[i]
-					self.sock.sendto(packetToSend.makeBytes(), addr)
-					#if(self.base == self.nextseqnum):
-					#	t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-					#	t.start()
-					self.nextseqnum += 1
-					#print "Packet List "
-					#print self.packetList
-					#print "Nextseqnum" + str(self.nextseqnum)
-					#print "len :" + str(len(self.packetList))
-					#print "N: " + str(self.N)
-					#exit(1)
-			else: #packet list is larger than N
+						print "GOT ACK FOR: " + str(packet)
+						#responseHeader = packet.header
+						self.base = header.acknum + 1
+						print "base: " + str(self.base)
+						print "nsn: " + str(self.nextseqnum)
+						for i in range(0, self.base): #cumulative ACK
+							self.packetList[i].isACKED = True
+						if(self.base == self.nextseqnum):
+							t.cancel()
+						else:
+							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+							t.start()
+
+				if self.packetList[-1].isACKED == True:
+					t.cancel()
+					break
+		else: #packet list is larger than N
+			while 1:
 				while (self.nextseqnum < self.base + self.N):		
 					packetToSend = self.packetList[self.nextseqnum]
 					#print "SND: " + str(packetToSend)
@@ -224,32 +243,27 @@ class RTPSocket:
 						t.start()
 					self.nextseqnum += 1
 
-			with self.lock:
-				if len(self.connections[addr[1]].ackList) != 0:
-					packet = self.connections[addr[1]].ackList.pop(0)
-					header = packet.header
+				with self.lock:
+					if len(self.connections[addr[1]].ackList) != 0:
+						packet = self.connections[addr[1]].getACK()
+						header = packet.header
 
-					#print "GOT ACK FOR: " + str(packet)
-					#responseHeader = packet.header
-					self.base = packet.header.acknum + 1
-					print "base: " + str(self.base)
-					for i in range(0, self.base): #cumulative ACK
-						self.packetList[i].isACKED = True
-					if(self.base == self.nextseqnum):
-						t.cancel()
-					else:
-						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-						t.start()
+						print "NN GOT ACK FOR: " + str(packet)
+						#responseHeader = packet.header
+						self.base = header.acknum + 1
+						print "base: " + str(self.base)
+						print "nsn: " + str(self.nextseqnum)
+						for i in range(0, self.base): #cumulative ACK
+							self.packetList[i].isACKED = True
+						if(self.base == self.nextseqnum):
+							t.cancel()
+						else:
+							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+							t.start()
 
-			if self.packetList[-1].isACKED:
-				ackLastPacket = True
-
-		#with self.lock:
-		#	response, dstaddr = self.sock.recvfrom(1000)
-
-
-			#if self.packetList[-1].isACKED:
-			#	ackLastPacket = True
+				if self.packetList[-1].isACKED == True:
+					t.cancel()
+					break
 
 		print "FINISHED SENDING MESSAGE"
 	def timeout(self, addr):
@@ -270,31 +284,30 @@ class RTPSocket:
 			last_acknum_sent = None
 
 			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
-			
 			if response:
 				rcvpkt = self.getPacket(response)
 				header = rcvpkt.header
 
-				if header.ACK == 0 and header.SYN == 1: #just SNY
+				if header.ACK == 0 and header.SYN == 1: #SYN
 					self.SYNqueue.append((rcvpkt, rcv_address)) #add to the SYN queue
+					continue
+				elif header.ACK == 1 and header.SYN == 1:  #GoT SYNACK
+					self.SYNACKqueue.append((rcvpkt, rcv_address))
 					continue
 				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
 					print "starting connection at " + str(rcv_address)
-					self.connections[rcv_address[1]].startConn()
+					with self.lock:
+						self.connections[rcv_address[1]].startConn()
 					self.server_isn = None
 					continue
-				elif header.ACK == 1 and header.SYN == 1:  #GIT SYNACK
-					self.SYNACKqueue.append((rcvpkt, rcv_address))
-					continue
 				elif rcvpkt and header.ACK == 1: #we got an ACK
-					#print "GOT ACK"
+					print "GOT ACK"
 					with self.lock:
-						self.connections[rcv_address[1]].ackList.append(rcvpkt)
+						self.connections[rcv_address[1]].addACK(rcvpkt)
 					continue
 				elif rcvpkt and header.ACK == 0: #we got data
 					rcv_port = rcv_address[1]
 					#print "RCV: " + str(rcvpkt)
-
 					#print "seqnum received: " + str(rcvpkt.header.seqnum)
 					#print "seqnum expected: " + str(expectedseqnum)
 					if rcvpkt.header.seqnum == expectedseqnum:
@@ -349,7 +362,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
-		#print "ACK: " + str(packet)
+		print "SENT ACK: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
@@ -492,7 +505,7 @@ class RTPPacket:
 	"""
 
 	MSS = 500 #5 bytes
-	RTT = 2 # placeholder
+	RTT = 10 # placeholder
 
 	def __init__(self, header, data=""):
 		"""Given an RTPHeader and data (optional), constructs a new RTPPacket."""
