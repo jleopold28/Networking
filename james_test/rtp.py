@@ -200,85 +200,37 @@ class RTPSocket:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
-		#print "len of packet list is " + str(len(self.packetList))
-		#print "PacketList: " + str(self.packetList)
-
-		print "LEN OF PACKET LIST: " + str(len(self.packetList))
-
+		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		self.base = 0 
 		self.nextseqnum = 0
-		if len(self.packetList) < self.N :   #sending message smaller than RWND --> send the whole thing
-			print "SENDING MESSAGE SMALLER THAN RWND"
-			for i in range(0, len(self.packetList)):
-				packetToSend = self.packetList[i]
+		while 1:
+			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
+				packetToSend = self.packetList[self.nextseqnum]
+				#print "SND: " + str(packetToSend)
+				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
-					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 					t.start()
 				self.nextseqnum += 1
-			while 1:
-				with self.lock:
-					if self.connections[addr[1]].foo():
-						packet = self.connections[addr[1]].getACK()
-						header = packet.header
 
-						#print "GOT ACK FOR: " + str(packet)
-						#responseHeader = packet.header
-						self.base = header.acknum + 1
-						#print "base: " + str(self.base)
-						#print "nsn: " + str(self.nextseqnum)
-						for i in range(0, self.base): #cumulative ACK
-							self.packetList[i].isACKED = True
-						if(self.base == self.nextseqnum):
-							t.cancel()
-						else:
-							t.cancel()
-							t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-							t.start()
+			with self.lock:
+				if self.connections[addr[1]].foo():
+					packet = self.connections[addr[1]].getACK()
+					header = packet.header
+					#print "GOT ACK FOR: " + str(packet)
+					#responseHeader = packet.header
+					self.base = header.acknum + 1
+					for i in range(0, self.base): #cumulative ACK
+						self.packetList[i].isACKED = True
+					if(self.base == self.nextseqnum):
+						t.cancel()
+					else:
+						t.cancel()
+						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+						t.start()
 
-				if self.packetList[-1].isACKED == True:
-					break
-		else: #packet list is larger than N
-			t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-
-			try:
-				while 1:
-					while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
-						packetToSend = self.packetList[self.nextseqnum]
-						#print "SND: " + str(packetToSend)
-						#raw_input("press to send")
-						self.sock.sendto(packetToSend.makeBytes(), addr)
-						if(self.base == self.nextseqnum):
-							t.start()
-						self.nextseqnum += 1
-
-					with self.lock:
-						if self.connections[addr[1]].foo():
-							packet = self.connections[addr[1]].getACK()
-							header = packet.header
-
-							print "GOT ACK FOR: " + str(packet)
-							#responseHeader = packet.header
-							self.base = header.acknum + 1
-							print "base: " + str(self.base)
-							print "nsn: " + str(self.nextseqnum)
-							for i in range(0, self.base): #cumulative ACK
-								self.packetList[i].isACKED = True
-							if(self.base == self.nextseqnum):
-								t.cancel()
-							else:
-								t.cancel()
-								t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-								t.start()
-
-					if self.packetList[-1].isACKED == True:
-						break
-			except Exception as inst:
-				print type(inst)
-				print inst.args
-				print inst
-				print "FdSAF"
-				sys.exit(1)
+			if self.packetList[-1].isACKED == True:
+				break
 
 		t.cancel()
 		print "FINISHED SENDING MESSAGE"
@@ -288,9 +240,6 @@ class RTPSocket:
 		Retransmits packets from base to nextseqnum-1
 		addr: tuple (host, port)
 		"""
-		print "TIMEOUT"
-		#print self.base
-		#print self.nextseqnum
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
@@ -385,7 +334,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
-		print "SENT ACK: " + str(packet)
+		#print "SENT ACK: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
