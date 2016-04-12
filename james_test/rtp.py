@@ -23,7 +23,11 @@ class RTPConnection:
 		self.data = ""
 
 	def getData(self):
-		return self.data
+
+		blah = self.data
+		self.data = ""
+
+		return blah
 
 	def addData(self, data):
 		self.data += data
@@ -94,7 +98,8 @@ class RTPSocket:
 			# then in connect we already have the connection in self.connections and just need to set conn.isOff = False
 			conn_id = dstaddr[1] # now identify by the client port! #random.randint(0,100000)
 			conn = RTPConnection(dstaddr, self.socket_port, self.rwnd)
-			self.connections[conn_id] = conn
+			with self.lock:
+				self.connections[conn_id] = conn
 
 			while True:
 				if conn.isOff == False:
@@ -153,8 +158,11 @@ class RTPSocket:
 		self.sendACK(self.socket_port, destination_address, seqnum, acknum)
 
 		conn = RTPConnection(destination_address, self.socket_port, self.rwnd)
-		conn_id = destination_address[1] 
-		self.connections[conn_id] = conn
+		conn_id = destination_address[1]
+
+		with self.lock:
+			self.connections[conn_id] = conn
+			
 		conn.startConn()
 		#print "returning RTP connection at " + str(conn_id)
 		return conn
@@ -281,7 +289,8 @@ class RTPSocket:
 					#print "seqnum received: " + str(rcvpkt.header.seqnum)
 					#print "seqnum expected: " + str(expectedseqnum)
 					if rcvpkt.header.seqnum == expectedseqnum:
-						self.connections[rcv_port].addData(rcvpkt.data)
+						with self.lock:
+							self.connections[rcv_port].addData(rcvpkt.data)
 						#print "sending ACK for packet in recv"
 						seqnum = rcvpkt.header.acknum
 

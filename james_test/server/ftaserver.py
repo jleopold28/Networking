@@ -12,6 +12,7 @@ sock = None
 def clientSession(conn, addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
 
+	#data = ""
 	while 1:
 		data = conn.getData()
 		if data:
@@ -51,13 +52,14 @@ def get_post(file1, file2, host, port):
 	#pass
 
 def get(conn, addr, filename):
+	#print "GET:"+filename
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
 	uploadFile(conn, addr, filename)
 
 def uploadFile(conn, addr, filename):
-	#print "UPLOADING FILE"
+	print "UPLOADING FILE"
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]

@@ -39,7 +39,7 @@ def get(sock, conn, filename, host, port):
 	#get_thread.join()
 
 def downloadFile(conn, filename):
-	#print "DOWNLOADING FILE"
+	print "DOWNLOADING FILE"
 	extensionList = filename.split(".")
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 
@@ -54,12 +54,14 @@ def downloadFile(conn, filename):
 			os.remove(filename)
 			print data
 			break
-		elif data[-3:]  == "EOF":
-			ofile.write(data)	
-			break	
+		elif data == "EOF":
+			break
+		elif data:
+			ofile.write(data)
 		else:
 			continue
 	ofile.close()
+	print "FINSHED DOWNLOADING"
 
 def uploadFile(filename, host, port):
 	"""Uploads file to server."""
