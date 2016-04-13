@@ -1,6 +1,7 @@
 """Client side of File Transfer Applciation with interactive command window."""
 import os
 import sys
+import thread
 import threading
 import Queue
 
@@ -30,6 +31,11 @@ def get(sock, conn, filename, host, port):
 	"""Downloads file from server."""
 
 	print "GET:"+filename
+	if filename == "CLOSE CONNECTION": # close the connection
+		sock.send("CLOSE CONNECTION", (host, port))
+		sock.clientClose(conn)
+		return
+
 	sock.send("GET:" + filename, (host,port)) #tell the server what operation we are doing
 	downloadFile(conn, filename)
 	#I dont think we need to use threading here, but lets leave it becuase it works for now
@@ -117,13 +123,11 @@ def main(argv):
 		if command == "disconnect":
 			disconnect = True
 			# disconnect from the server gracefully
-			# todo send FIN to server
-			try:
-				#sock.clientClose()
-				sock.close()
-			except:
-				disconnect = True
-				#CHANGE THIS BACK 	disconnect = False
+			get(sock, conn, "CLOSE CONNECTION", host, port) # send close message
+			print "Closing connection to server."
+			sys.exit(0)
+			print "called sys.exit"
+
 
 		elif "get-post" in command:
 			# arguments should be F G
@@ -156,7 +160,7 @@ def main(argv):
 		else:
 			print "Invalid command."
 
-	sys.exit(1)
+		sys.exit(0)
   
 
 if __name__ == "__main__":

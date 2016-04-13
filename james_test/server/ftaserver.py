@@ -16,6 +16,9 @@ def clientSession(conn, addr):
 	while 1:
 		data = conn.getData()
 		if data:
+			if data == "CLOSE CONNECTION":
+				sock.serverClose(conn)
+				return
 			#determine which command we are doing and whith what filename
 			dataList = data.split(":")
 			command = dataList[0]

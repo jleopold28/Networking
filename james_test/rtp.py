@@ -62,9 +62,11 @@ class RTPSocket:
 		self.server_isn = None
 		self.SYNqueue = []
 		self.SYNACKqueue = []
+		self.FINqueue = []
 
 		self.lock = threading.Lock()
 		self.recvThread = threading.Thread(target = self.recv)
+		self.recvThread.daemon = True # so the thread will exit when the program exits
 
 
 	def bind(self, socket_addr):
@@ -272,6 +274,9 @@ class RTPSocket:
 				elif header.ACK == 1 and header.SYN == 1:  #GoT SYNACK
 					self.SYNACKqueue.append((rcvpkt, rcv_address))
 					continue
+				elif header.FIN == 1: # Got FIN
+					self.FINqueue.append((rcvpkt, rcv_address))
+					continue
 				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
 					#print "starting connection at " + str(rcv_address)
 					with self.lock:
@@ -366,11 +371,10 @@ class RTPSocket:
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
-	def sendFIN(self):
+	def sendFIN(self, srcport, dstaddr, seqnum, acknum):
 		"""Sends a FIN packet to (self.dsthost, self.dstport)"""
 		# make FIN packet
-		seqnum = 0
-		acknum = 0
+		dstport = dstaddr[1]
 		ACK = 0
 		SYN = 0
 		FIN = 1
@@ -378,77 +382,95 @@ class RTPSocket:
 		checksum = 0
 		eom = 1
 
-		header = RTPHeader(self.socket_port, self.dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
+		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
 		packet = RTPPacket(header, "CLOSE CONNECTION")
 	
 		#print packet
 		#print "Sending FIN Packet"
-		self.sock.sendto(packet.makeBytes(), (self.dsthost, self.dstport))
+		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
-	def clientClose(self):
-		"""Closes the RTP connection from the client side."""
+	def clientClose(self, conn):
+		"""Closes the RTP socket and connection from the client side."""
 		# send FIN to server
-		self.sendFIN()
-		#print "Sent FIN Packet"
-		
+		addr = conn.dst_addr
+		self.sendFIN(self.socket_port, addr, 0, 0)
+
 		# wait for ACK from server
-		self.setTimeout()
+		#self.setTimeout()
 		while 1:
 			try:
-				#data, addr = self.rtpsocket.recvfrom(1000)
-				data, addr = self.recvfrom()
-				if data:
-					if self.getPacket(data[0]).isACK:
-						#print "Received ACK"
+				with self.lock:
+					if self.connections[addr[1]].foo():
+						packet = self.connections[addr[1]].getACK()
+						header = packet.header
 						break
-
-			except socket.error: #socket.error
+			except socket.error:
 				print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
 				return
 
-		# wait for server to close (wait for FIN)
-		self.setTimeout()
+		# wait for FIN from server
+		#self.setTimeout()
 		while 1:
 			try:
-				#data, addr = self.rtpsocket.recvfrom(1000)
-				data, addr = self.recvfrom()
-				if data:
-					if self.getPacket(data[0]).isFIN:
-						#print "Received FIN"
-						break
+				# wait for FIN bit and pop from FIN queue
+				if len(self.FINqueue) == 0:
+					continue
+				else:
+					finPacket, fromaddr = self.FINqueue.pop(0) # get first FIN
+					header = finPacket.header
+
+					break
 			except socket.error:
 				print "Did not receive FIN - socket timed out."
 				return
 
 		# send another ACK to the server... -____-
-		dstaddr = (self.dsthost, self.dstport)
-		self.sendACK(self.socket_port, self.dstport, 0, 0, dstaddr) # using 0 as seqnum
-		#print "Received FIN from server, sent ACK"
+		self.sendACK(self.socket_port, addr, 0, 0) # using 0 as seqnum
 
 		# wait a while to make sure the ACK gets received
-		time.sleep(2 * RTPPacket.RTT) # 5 is placeholder - should be 2 * MSL
+		time.sleep(2)#(2 * RTPPacket.RTT) # 5 is placeholder - should be 2 * MSL
 
 		# finally close the connection
-		print "Closing Connection"
-		self.rtpsocket.close()
+		self.sock.close() # close the socket
+		return
 
 
-	def serverClose(self):
-		"""Closes the RTP connection from the server side."""
-		#print "Sending ACK to Client"
-		#send ACK to client
-		dstaddr = (self.dsthost, self.dstport)
-		self.sendACK(self.socket_port, self.dstport, 0, 0, dstaddr)
-		#print "Sending FIN to Client"
-		#send FIN to client
-		self.sendFIN()
-		print "Closing Connection"
-		self.rtpsocket.close()
+	def serverClose(self, conn):
+		"""Closes the RTP connection passed in."""
+		# wait for FIN
+		#self.setTimeout()
+		while 1:
+			if len(self.FINqueue) == 0:
+				continue
+			else:
+				finPacket, fromaddr = self.FINqueue.pop(0)
+				header = finPacket.header
+				break
 
-	def close(self):
-		self.sock.close()
-		print "Closed Connection"
+		# send ACK
+		dstaddr = conn.dst_addr
+		self.sendACK(self.socket_port, dstaddr, 0, 0)
+
+		# wait for app
+		# ???
+
+		# send FIN
+		self.sendFIN(self.socket_port, dstaddr, 0, 0)
+
+		# wait for ACK
+		#self.setTimeout()
+		while 1:
+			with self.lock:
+				if self.connections[dstaddr[1]].foo():
+					packet = self.connections[dstaddr[1]].getACK()
+					header = packet.header
+					break
+
+		# close connection
+		conn.isOff = True
+		with self.lock:
+			del self.connections[conn.dst_port]# remove conn from self.connections
 
 
 	def getPacket(self, bytes):
@@ -470,7 +492,6 @@ class RTPSocket:
 	def __str__(self):
 		"""Returns a string representation of an RTPSocket."""
 		return "Socket at Port " + str(self.socket_host) + ":" + str(self.socket_port) + " is sending to " + str(self.dst_host) + ":" + str(self.dst_port) + "  ID = " + str(self.cid) + "\n"
-
 
 
 	def setTimeout(self):
