@@ -417,10 +417,14 @@ class RTPSocket:
 				if len(self.FINqueue) == 0:
 					continue
 				else:
-					finPacket, fromaddr = self.FINqueue.pop(0) # get first FIN
-					header = finPacket.header
-
-					break
+					with self.lock: # to prevent other FINs from being added to queue?
+						finPacket, fromaddr = self.FINqueue[0] # get first FIN but do not remove from queue
+						header = finPacket.header
+						if header.source_port == addr[1]: # check if FIN came from this connection
+							self.FINqueue.pop(0) # now remove the FIN from queue
+							break
+						else:
+							continue
 			except socket.error:
 				print "Did not receive FIN - socket timed out."
 				return
@@ -429,11 +433,10 @@ class RTPSocket:
 		self.sendACK(self.socket_port, addr, 0, 0) # using 0 as seqnum
 
 		# wait a while to make sure the ACK gets received
-		time.sleep(2)#(2 * RTPPacket.RTT) # 5 is placeholder - should be 2 * MSL
+		time.sleep(2) # placeholder - should be 2 * MSL
 
 		# finally close the connection
-		self.sock.close() # close the socket
-		return
+		self.sock.close()
 
 
 	def serverClose(self, conn):
@@ -444,9 +447,14 @@ class RTPSocket:
 			if len(self.FINqueue) == 0:
 				continue
 			else:
-				finPacket, fromaddr = self.FINqueue.pop(0)
-				header = finPacket.header
-				break
+				with self.lock: # to prevent other FINs from being added to queue?
+					finPacket, fromaddr = self.FINqueue[0] # get first FIN but do not remove from queue
+					header = finPacket.header
+					if header.source_port == conn.dst_addr[1]: # check if FIN came from this connection
+						self.FINqueue.pop(0) # now remove the FIN from queue
+						break
+					else:
+						continue
 
 		# send ACK
 		dstaddr = conn.dst_addr
