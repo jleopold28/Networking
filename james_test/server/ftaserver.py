@@ -12,7 +12,6 @@ sock = None
 def clientSession(conn, addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
 
-	#data = ""
 	while 1:
 		data = conn.getData()
 		if data:
@@ -24,14 +23,14 @@ def clientSession(conn, addr):
 			command = dataList[0]
 			if command == "GET":
 				filename = dataList[1]
-				# send the file (or error msg) to client
 				get(conn, addr, filename)
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
-				# send the file (or error msg) to client
 				get_post(conn, addr, file1, file2)
-				#sock.send(error_msg, (dest_host, dest_port))
+			else:
+				error_msg = "INVALID COMMAND"
+				sock.send(error_msg, addr)
 
 def get_post(file1, file2, host, port):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
@@ -55,7 +54,6 @@ def get_post(file1, file2, host, port):
 	#pass
 
 def get(conn, addr, filename):
-	#print "GET:"+filename
 	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
 	#upload_thread.start()
 	#upload_thread.join()
@@ -66,7 +64,7 @@ def uploadFile(conn, addr, filename):
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
-	#print files
+
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
 		sock.send(error_msg, addr)
@@ -75,38 +73,37 @@ def uploadFile(conn, addr, filename):
 		send_file = open(filename, "rb") #rb to read in binary mode
 
 	try:
-		# send file to client
-		msg = send_file.read() # read a the entire file?
+		msg = send_file.read() # read a the entire file
 		sock.send(msg, addr)
 		send_file.close()      # close the file
+
 		sock.send("EOF", addr)
 		print "Sent file to client"
+
 	except Exception, e:
 		if send_file:
 			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
 		print e
-		#lock.release()
 
-def downloadFile(filename, host, port):
+def downloadFile(conn, addr, filename):
 	extensionList = filename.split(".")
 	ofile = open("post_G." + extensionList[1], "wb") # open in write bytes mode
-	print "DOWNLOADING FILE"
 	while 1:
 		# receive response from server
-		data, addr = sock.recv()
+		data = conn.getData()
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove(filename)
 			print data
 			break
-		elif data == "FILE FINISHED SENDING":
+		elif data == "EOF":
 			break
 		elif data:
-			# write the file
 			ofile.write(data)				
 		else:
 			continue
+
 	ofile.close()
 
 def main(argv):

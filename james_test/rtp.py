@@ -24,11 +24,9 @@ class RTPConnection:
 
 	def getData(self):
 		if self.data:
-
-			blah = self.data
+			out = self.data
 			self.data = ""
-
-			return blah
+			return out
 		else:
 			return ""
 
