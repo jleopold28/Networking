@@ -231,12 +231,27 @@ class RTPSocket:
 				self.nextseqnum += 1
 
 			#FIRST THING! - lock this?
-			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
+			#response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 
-			if response:
-				packet = self.getPacket(response)
-				header = packet.header
-				if packet and header.ACK == 1 and header.checksum == packet.getChecksum() and rcv_address == addr:
+			#if response:
+			#	packet = self.getPacket(response)
+			#	header = packet.header
+			#	if packet and header.ACK == 1 and header.checksum == packet.getChecksum() and rcv_address == addr:
+			#		self.base = header.acknum + 1
+			#		for i in range(0, self.base): #cumulative ACK
+			#			self.packetList[i].isACKED = True
+			#		if(self.base == self.nextseqnum):
+			#			t.cancel()
+			#		else:
+			#			if t != None:
+			#				t.cancel()
+			#			t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+			#			t.start()
+			with self.lock:
+				if self.connections[addr[1]].foo():
+					packet = self.connections[addr[1]].getACK()
+					header = packet.header
+					#print "GOT ACK FOR: " + str(packet)
 					self.base = header.acknum + 1
 					for i in range(0, self.base): #cumulative ACK
 						self.packetList[i].isACKED = True
@@ -247,22 +262,6 @@ class RTPSocket:
 							t.cancel()
 						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 						t.start()
-
-				#if self.connections[addr[1]].foo():
-					#packet = self.connections[addr[1]].getACK()
-					#header = packet.header
-					#print "GOT ACK FOR: " + str(packet)
-					#responseHeader = packet.header
-					#self.base = header.acknum + 1
-					#for i in range(0, self.base): #cumulative ACK
-				#		self.packetList[i].isACKED = True
-				#	if(self.base == self.nextseqnum):
-				#		t.cancel()
-				#	else:
-				#		if t != None:
-				#			t.cancel()
-				#		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-				#		t.start()
 
 			if self.packetList[-1].isACKED == True:
 				if t != None:
@@ -313,12 +312,12 @@ class RTPSocket:
 						self.connections[rcv_address[1]].startConn()
 					self.server_isn = None
 					continue
-					#elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #ACK
+				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #ACK
 					#print "GOT ACK"
-					#	with self.lock:
-					#		self.connections[rcv_address[1]].addACK(rcvpkt)
-					#	continue
-					# if data was received:
+					with self.lock:
+						self.connections[rcv_address[1]].addACK(rcvpkt)
+					continue
+				# if data was received:
 				elif rcvpkt and header.ACK == 0 and header.checksum == rcvpkt.getChecksum(): #we got data AND not corrupt
 					rcv_port = rcv_address[1]
 					#print "RCV: " + str(rcvpkt)
