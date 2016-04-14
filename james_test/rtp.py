@@ -10,10 +10,9 @@ import sys
 
 class RTPConnection:
 	"""Represents a connection over RTP"""
-	def __init__(self, destination_address, socket_port, rwnd):
+	def __init__(self, destination_address, socket_port):
 		"""Constructs a new RTPConnection."""
 		self.socket_port = socket_port
-		self.rwnd = rwnd
 		self.dst_addr = destination_address
 		self.dst_host = destination_address[0]
 		self.dst_port = destination_address[1]
@@ -100,7 +99,7 @@ class RTPSocket:
 			# accept is server side so I think we need to create the connection object at the client address
 			# then in connect we already have the connection in self.connections and just need to set conn.isOff = False
 			conn_id = dstaddr[1] # now identify by the client port! #random.randint(0,100000)
-			conn = RTPConnection(dstaddr, self.socket_port, self.rwnd)
+			conn = RTPConnection(dstaddr, self.socket_port)
 			with self.lock:
 				self.connections[conn_id] = conn
 
@@ -129,10 +128,10 @@ class RTPSocket:
 		#print "Sending SYN Packet with seqnum = " + str(client_isn)
 		self.sendSYN(self.socket_port, destination_address, client_isn)
 
-		#print "sent SYN to " + str(destination_address) + ", waiting for SYNACK"
+		print "sent SYN to " + str(destination_address) + ", waiting for SYNACK"
 
 		self.recvThread.start() # NEW
-		#print "waiting for SYNACK queue"
+		print "waiting for SYNACK queue"
 		while 1:
 			if len(self.SYNACKqueue) == 0: # no SYN bits recevied
 				continue
@@ -142,13 +141,13 @@ class RTPSocket:
 				#sys.exit(1)
 				break
 
-		#print "SYNACK received"
+		print "SYNACK received"
 		
 		self.socket_host = ""
 		self.socket_port = header.dest_port
 		self.socket_addr = (self.socket_host, self.socket_port)
 
-		#print "Socket address:" + str(self.socket_addr)
+		print "Socket address:" + str(self.socket_addr)
 
 		#self.sock.bind(self.socket_addr) # removed bc I don't think we need to bind on the client side?
 
@@ -160,14 +159,15 @@ class RTPSocket:
 		#self.socket_port = header.dest_port
 		self.sendACK(self.socket_port, destination_address, seqnum, acknum)
 
-		conn = RTPConnection(destination_address, self.socket_port, self.rwnd)
+		conn = RTPConnection(destination_address, self.socket_port)
 		conn_id = destination_address[1]
 
-		with self.lock:
+		with self.lock:		
 			self.connections[conn_id] = conn
-			
+		
+	
 		conn.startConn()
-		#print "returning RTP connection at " + str(conn_id)
+		print "returning RTP connection at " + str(conn_id)
 		return conn
 
 
@@ -212,39 +212,63 @@ class RTPSocket:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
-		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+		#t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+		t = None
 		self.base = 0 
 		self.nextseqnum = 0
 		while 1:
-			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
+			while (self.nextseqnum < self.base + self.rwnd) and self.nextseqnum < len(self.packetList):	
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
+					if t != None:
+						#is there is a timer running, stop it
+						t.cancel()
+					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 					t.start()
 				self.nextseqnum += 1
 
-			with self.lock:
-				if self.connections[addr[1]].foo():
-					packet = self.connections[addr[1]].getACK()
-					header = packet.header
-					#print "GOT ACK FOR: " + str(packet)
-					#responseHeader = packet.header
+			#FIRST THING! - lock this?
+			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
+
+			if response:
+				packet = self.getPacket(response)
+				header = packet.header
+				if packet and header.ACK == 1 and header.checksum == packet.getChecksum() and rcv_address == addr:
 					self.base = header.acknum + 1
 					for i in range(0, self.base): #cumulative ACK
 						self.packetList[i].isACKED = True
 					if(self.base == self.nextseqnum):
 						t.cancel()
 					else:
-						t.cancel()
+						if t != None:
+							t.cancel()
 						t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 						t.start()
 
+				#if self.connections[addr[1]].foo():
+					#packet = self.connections[addr[1]].getACK()
+					#header = packet.header
+					#print "GOT ACK FOR: " + str(packet)
+					#responseHeader = packet.header
+					#self.base = header.acknum + 1
+					#for i in range(0, self.base): #cumulative ACK
+				#		self.packetList[i].isACKED = True
+				#	if(self.base == self.nextseqnum):
+				#		t.cancel()
+				#	else:
+				#		if t != None:
+				#			t.cancel()
+				#		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+				#		t.start()
+
 			if self.packetList[-1].isACKED == True:
+				if t != None:
+					t.cancel()
 				break
 
-		t.cancel()
 		#print "FINISHED SENDING MESSAGE"
 
 	def timeout(self, addr):
@@ -265,7 +289,10 @@ class RTPSocket:
 		last_acknum_sent = None
 
 		while True:
+
+			#LOCK THIS?
 			response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
+
 			if response:
 				rcvpkt = self.getPacket(response)
 				header = rcvpkt.header
@@ -286,13 +313,13 @@ class RTPSocket:
 						self.connections[rcv_address[1]].startConn()
 					self.server_isn = None
 					continue
-				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #ACK
+					#elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #ACK
 					#print "GOT ACK"
-					with self.lock:
-						self.connections[rcv_address[1]].addACK(rcvpkt)
-					continue
-				# if data was received:
-				elif rcvpkt and header.ACK == 0 and rcvpkt.header.checksum == rcvpkt.getChecksum(): #we got data AND not corrupt
+					#	with self.lock:
+					#		self.connections[rcv_address[1]].addACK(rcvpkt)
+					#	continue
+					# if data was received:
+				elif rcvpkt and header.ACK == 0 and header.checksum == rcvpkt.getChecksum(): #we got data AND not corrupt
 					rcv_port = rcv_address[1]
 					#print "RCV: " + str(rcvpkt)
 					#print "seqnum received: " + str(rcvpkt.header.seqnum)
@@ -523,7 +550,7 @@ class RTPPacket:
 	"""
 
 	MSS = 500 #5 bytes
-	RTT = 10 # placeholder
+	RTT = 2 # placeholder
 
 	def __init__(self, header, data=""):
 		"""Given an RTPHeader and data (optional), constructs a new RTPPacket."""

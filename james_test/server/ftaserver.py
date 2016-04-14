@@ -78,6 +78,7 @@ def uploadFile(conn, addr, filename):
 		send_file.close()      # close the file
 
 		sock.send("EOF", addr)
+		
 		print "Sent file to client"
 
 	except Exception, e:
