@@ -23,11 +23,12 @@ class RTPConnection:
 		self.data = ""
 
 	def getData(self):
-
-		blah = self.data
-		self.data = ""
-
-		return blah
+		if self.data:
+			out = self.data
+			self.data = ""
+			return out
+		else:
+			return ""
 
 	def addData(self, data):
 		self.data += data
