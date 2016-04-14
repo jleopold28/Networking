@@ -85,6 +85,7 @@ def uploadFile(conn, addr, filename):
 			send_file.close() # make sure file is closed
 		print "Error: Unable to send file."
 		print e
+		raise
 
 def downloadFile(conn, addr, filename):
 	extensionList = filename.split(".")

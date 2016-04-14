@@ -1,23 +1,20 @@
 """Client side of File Transfer Applciation with interactive command window."""
 import os
 import sys
-import thread
 import threading
 import Queue
 
 sys.path.insert(0,'..')
 from rtp import *
 
-sock = None
-
-def get_post(conn, file1, file2, addr):
+def get_post(sock, conn, file1, file2, host, port):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
-
 	command = "GET-POST"
-	sock.send(command + ":" + file1 + ":" + file2, addr)
+	sock.send(command + ":" + file1 + ":" + file2, (host,port))
 
-	download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
-	upload_thread = threading.Thread(target = uploadFile, args = (conn, file2, addr))
+	#need to implement threading here
+	download_thread = threading.Thread(target = downloadFile, args = (file1, host, port))
+	upload_thread = threading.Thread(target = uploadFile, args = (file2, host, port))
 	
 	download_thread.start()
 	upload_thread.start()
@@ -29,10 +26,20 @@ def get_post(conn, file1, file2, addr):
 	#downloadFile(file1, sock, host, port, rwnd)
 	#uploadFile(file2, sock, host, port, rwnd)
 
-def get(conn, filename, addr):
+def get(sock, conn, filename, host, port):
 	"""Downloads file from server."""
-	sock.send("GET:" + filename, addr) #tell the server what operation we are doing
-	downloadFile(conn, filename)
+
+	print "GET:"+filename
+	if filename == "CLOSE CONNECTION":
+		sock.send(filename, (host, port)) # tell the server to close connection
+	else:
+		sock.send("GET:" + filename, (host,port)) #tell the server what operation we are doing
+		downloadFile(conn, filename)
+	#I dont think we need to use threading here, but lets leave it becuase it works for now
+	#having the method in a thread cant hurt
+	#get_thread = threading.Thread(target = downloadFile, args = (filename, sock, host, port, rwnd))
+	#get_thread.start()
+	#get_thread.join()
 
 def downloadFile(conn, filename):
 	print "DOWNLOADING FILE"
@@ -40,16 +47,17 @@ def downloadFile(conn, filename):
 	ofile = open("get_F." + extensionList[1], "wb") # open in write bytes mode
 
 	while 1:
+		# receive response from server
 		data = conn.getData()
+		#data, addr = sock.recv(conn_id)
+		#data, addr = conn.recv()
+		#data = sock.getData()
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove(filename)
 			print data
 			break
 		elif data == "EOF":
-			break
-		elif data[-3:] == "EOF":
-			ofile.write(data[:-3])
 			break
 		elif data:
 			ofile.write(data)
@@ -58,24 +66,28 @@ def downloadFile(conn, filename):
 	ofile.close()
 	print "FINSHED DOWNLOADING"
 
-def uploadFile(conn, filename, addr):
+def uploadFile(filename, host, port):
 	"""Uploads file to server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
-	#print files
+	print files
+	#print sock.rwnd
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
-		sock.send(error_msg, addr)
+		sock.send(error_msg, (host, port))
 		send_file = None
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
 	print "UPLOADING FILE"
 	try:
-		msg = send_file.read() # read file
-		sock.send(msg, addr)
-		send_file.close() 
-		sock.send("EOF", addr)
-		print "sent file to server"
+		# send file to client
+		msg = send_file.read(sock.rwnd) # read a portion of the file
+		while msg:
+			sock.send(msg, (host, port))
+			msg = send_file.read(sock.rwnd)
+		send_file.close() # close the file
+		sock.send("FILE FINISHED SENDING", (host, port))
+		print "sent file to client"
 	except Exception, e:
 		if send_file:
 			send_file.close() # make sure file is closed
@@ -98,7 +110,6 @@ def main(argv):
 
 	disconnect = False
 
-	global sock
 	sock = RTPSocket()
 	sock.rwnd = rwnd
 
@@ -109,12 +120,15 @@ def main(argv):
 		if command == "disconnect":
 			disconnect = True
 			# disconnect from the server gracefully
-			# send close message
-			sock.send("CLOSE CONNECTION", (host, port))
-			sock.clientClose(conn)
-			print "Closing connection to server."
-			sys.exit(0)
-			print "called sys.exit"
+			# todo send FIN to server
+			try:
+				get(sock, conn, "CLOSE CONNECTION", host, port) # send CLOSE CONNECTION to client
+				sock.clientClose()
+				sock.close()
+			except:
+				disconnect = True
+				#CHANGE THIS BACK 	disconnect = False
+
 		elif "get-post" in command:
 			# arguments should be F G
 			# F: download file F from the server
@@ -126,7 +140,7 @@ def main(argv):
 			f = cmd_list[1]
 			g = cmd_list[2]
 			try:
-				get_post(conn, f, g, (host, port))
+				get_post(sock, conn, f, g, host, port)
 			except:
 				print "Error downloading or uploading file."
 
@@ -139,14 +153,14 @@ def main(argv):
 				continue
 			f = cmd_list[1]
 			try:
-				get(conn, f, (host, port))
+				get(sock, conn, f, host, port)
 			except:
 				print "Error downloading file."
 				raise # for debugging
 		else:
 			print "Invalid command."
 
-		sys.exit(0)
+	sys.exit(1)
   
 
 if __name__ == "__main__":

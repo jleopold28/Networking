@@ -207,6 +207,7 @@ class RTPSocket:
 			else:
 				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 0)
 			packet = RTPPacket(header, dataSegments[d])
+			packet.setChecksum()
 
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
@@ -272,10 +273,10 @@ class RTPSocket:
 				if header.ACK == 0 and header.SYN == 1: #SYN
 					self.SYNqueue.append((rcvpkt, rcv_address)) #add to the SYN queue
 					continue
-				elif header.ACK == 1 and header.SYN == 1:  #GoT SYNACK
+				elif header.ACK == 1 and header.SYN == 1:  #SYNACK
 					self.SYNACKqueue.append((rcvpkt, rcv_address))
 					continue
-				elif header.FIN == 1: # Got FIN
+				elif header.FIN == 1: #FIN
 					self.FINqueue.append((rcvpkt, rcv_address))
 					continue
 				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
@@ -284,17 +285,18 @@ class RTPSocket:
 						self.connections[rcv_address[1]].startConn()
 					self.server_isn = None
 					continue
-				elif rcvpkt and header.ACK == 1: #we got an ACK
+				elif rcvpkt and header.ACK == 1: #ACK
 					#print "GOT ACK"
 					with self.lock:
 						self.connections[rcv_address[1]].addACK(rcvpkt)
 					continue
+				# if data was received:
 				elif rcvpkt and header.ACK == 0: #we got data
 					rcv_port = rcv_address[1]
 					#print "RCV: " + str(rcvpkt)
 					#print "seqnum received: " + str(rcvpkt.header.seqnum)
 					#print "seqnum expected: " + str(expectedseqnum)
-					if rcvpkt.header.seqnum == expectedseqnum:
+					if rcvpkt.header.seqnum == expectedseqnum and rcvpkt.header.checksum == rcvpkt.getChecksum(): # NEW: Check for corrupt packet
 						with self.lock:
 							self.connections[rcv_port].addData(rcvpkt.data)
 						#print "sending ACK for packet in recv"
@@ -489,7 +491,7 @@ class RTPSocket:
 		"""
 		n = struct.unpack("!H", bytes[:2]) # length of data string
 		data_size = n[0] # get number from tuple
-		unpack_fmt = '!HHHLLBBBHHB' + str(data_size) + 's' # header format + s * data_size
+		unpack_fmt = '!HHHLLBBBHLB' + str(data_size) + 's' # header format + s * data_size
 		tup = struct.unpack(unpack_fmt, bytes) # unpacks the packet into a tuple
 
 		# now make new RTPPacket object with info from the tuple
@@ -558,9 +560,10 @@ class RTPPacket:
 
 	# http://www.binarytides.com/raw-socket-programming-in-python-linux/
 	# http://locklessinc.com/articles/tcp_checksum/
-	def checksum(self):
+	def getChecksum(self):
 		"""Returns the checksum of a packet"""
-		pkt = self.makeBytes()
+		# TODO exclude checksum from the checksum calculation!
+		pkt = self.header.makePseudoHeader() + self.data
 		# calculate checksum on header + data
 		csum = 0 # initialize sum to 0
 		# if packet length is odd, add padding 0 at end
@@ -573,11 +576,13 @@ class RTPPacket:
 		csum = (csum >> 16) + (csum & 0xFFFF)
 		csum = csum + (csum >> 16)
 		csum = ~csum & 0xFFFF
+		return int(csum)
+		
 
 
 	def setChecksum(self):
 		"""Sets the checksum field in the RTPPacket header"""
-		csum = self.checksum()
+		csum = self.getChecksum()
 		self.header.checksum = csum
 
 
@@ -608,4 +613,9 @@ class RTPHeader:
 
 	def makeHeader(self, len_data = 0):
 		"""Packs header fields and returns a byte string."""
-		return struct.pack('!HHHLLBBBHHB', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum, self.eom)
+		return struct.pack('!HHHLLBBBHLB', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum, self.eom)
+
+
+	def makePseudoHeader(self):
+		"""Packs certain header fields into pseudo header to be used in checksum calculation."""
+		return struct.pack('!HHLLBBBHB', self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.eom) 
