@@ -270,33 +270,34 @@ class RTPSocket:
 				rcvpkt = self.getPacket(response)
 				header = rcvpkt.header
 				#print "RCV: " + str(rcvpkt)
-				if header.ACK == 0 and header.SYN == 1: #SYN
+				if header.ACK == 0 and header.SYN == 1 and header.checksum == rcvpkt.getChecksum(): #SYN
 					self.SYNqueue.append((rcvpkt, rcv_address)) #add to the SYN queue
 					continue
-				elif header.ACK == 1 and header.SYN == 1:  #SYNACK
+				elif header.ACK == 1 and header.SYN == 1 and header.checksum == rcvpkt.getChecksum():  #SYNACK
 					self.SYNACKqueue.append((rcvpkt, rcv_address))
 					continue
-				elif header.FIN == 1: #FIN
+				elif header.FIN == 1 and header.checksum == rcvpkt.getChecksum(): #FIN
 					self.FINqueue.append((rcvpkt, rcv_address))
 					continue
-				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1):   #START CONNECTION WITH ACK 
+				#START CONNECTION WITH ACK
+				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1) and header.checksum == rcvpkt.getChecksum(): 
 					#print "starting connection at " + str(rcv_address)
 					with self.lock:
 						self.connections[rcv_address[1]].startConn()
 					self.server_isn = None
 					continue
-				elif rcvpkt and header.ACK == 1: #ACK
+				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #ACK
 					#print "GOT ACK"
 					with self.lock:
 						self.connections[rcv_address[1]].addACK(rcvpkt)
 					continue
 				# if data was received:
-				elif rcvpkt and header.ACK == 0: #we got data
+				elif rcvpkt and header.ACK == 0 and rcvpkt.header.checksum == rcvpkt.getChecksum(): #we got data AND not corrupt
 					rcv_port = rcv_address[1]
 					#print "RCV: " + str(rcvpkt)
 					#print "seqnum received: " + str(rcvpkt.header.seqnum)
 					#print "seqnum expected: " + str(expectedseqnum)
-					if rcvpkt.header.seqnum == expectedseqnum and rcvpkt.header.checksum == rcvpkt.getChecksum(): # NEW: Check for corrupt packet
+					if rcvpkt.header.seqnum == expectedseqnum:
 						with self.lock:
 							self.connections[rcv_port].addData(rcvpkt.data)
 						#print "sending ACK for packet in recv"
@@ -334,6 +335,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
 		packet = RTPPacket(header, "")
+		packet.setChecksum()
 		#print "SND: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
@@ -351,6 +353,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
+		packet.setChecksum()
 		#print "SENT ACK: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
@@ -368,6 +371,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom) # CHANGE THIS not the right seqnum, acknum etc
 		packet = RTPPacket(header, "")
+		packet.setChecksum()
 	
 		#print packet
 		#print "SYNACK: "+ str(packet)
@@ -387,6 +391,7 @@ class RTPSocket:
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
 		packet = RTPPacket(header, "CLOSE CONNECTION")
+		packet.setChecksum()
 	
 		#print packet
 		#print "Sending FIN Packet"
