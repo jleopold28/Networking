@@ -37,7 +37,7 @@ def downloadFile(conn, filename):
 		data = conn.getData()
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
-			os.remove(filename)
+			os.remove("get_F_" + fileList[0] + "." + fileList[1])#os.remove(filename)
 			print data
 			break
 		elif data == "EOF":
@@ -116,7 +116,13 @@ def main(argv):
 				print "Wrong number of arguments for get-post (expected 2)"
 				continue
 			f = cmd_list[1]
+			if "." not in f:
+				print "Invalid filename: " + f
+				continue
 			g = cmd_list[2]
+			if "." not in g:
+				print "Invalid filename: " + g
+				continue
 			try:
 				get_post(conn, f, g, (host, port))
 			except:
@@ -130,6 +136,10 @@ def main(argv):
 				print "Wrong number of arguments for get (expected 1)"
 				continue
 			f = cmd_list[1]
+			# check if valid filename (filename.extension)
+			if "." not in f:
+				print "Invalid filename: " + f
+				continue
 			try:
 				get(conn, f, (host,port))
 			except:
