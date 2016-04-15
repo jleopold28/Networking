@@ -17,7 +17,7 @@ def clientSession(conn, addr):
 		if data:
 			if data == "CLOSE CONNECTION":
 				sock.serverClose(conn)
-				print "CLOSEING SESSION FOR " + str(addr)
+				print "CLOSEING SESSION FOR " + str(addr) + "\n"
 				break
 			#determine which command we are doing and whith what filename
 			dataList = data.split(":")
@@ -34,7 +34,7 @@ def clientSession(conn, addr):
 				sock.send(error_msg, addr)
 	return
 
-def get_post(conn, file1, file2, addr):
+def get_post(conn, addr, file1, file2):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 
 	upload_thread = threading.Thread(target = uploadFile, args = (file1, addr))

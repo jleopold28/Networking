@@ -28,7 +28,7 @@ def get(conn, filename, addr):
 	
 
 def downloadFile(conn, filename):
-	#print "DOWNLOADING FILE"
+	print "DOWNLOADING FILE"
 	fileList = filename.split(".")
 	ofile = open("get_F_" + fileList[0] + "." +fileList[1], "wb") # open in write bytes mode
 
@@ -46,7 +46,7 @@ def downloadFile(conn, filename):
 		else:
 			continue
 	ofile.close()
-	#print "FINSHED DOWNLOADING"
+	print "FINSHED DOWNLOADING\n"
 	return
 
 def uploadFile(filename, addr):

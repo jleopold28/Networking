@@ -193,7 +193,7 @@ class RTPSocket:
 			ACK = 0
 			SYN = 0 
 			FIN = 0 
-			rwnd = self.rwnd
+			rwnd = int(self.rwnd)
 			checksum = 0
 			if d == len(dataSegments) - 1:
 				header = RTPHeader(source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, 1)
@@ -553,6 +553,7 @@ class RTPPacket:
 		"""Returns the checksum of a packet"""
 		# TODO exclude checksum from the checksum calculation!
 		pkt = self.header.makePseudoHeader() + self.data
+
 		# calculate checksum on header + data
 		csum = 0 # initialize sum to 0
 		# if packet length is odd, add padding 0 at end
