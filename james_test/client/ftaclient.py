@@ -14,11 +14,12 @@ def get_post(conn, file1, file2, addr):
 	command = "GET-POST"
 	sock.send(command + ":" + file1 + ":" + file2, addr)
 
-	download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
+	#download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, addr))
-	
-	download_thread.start()
+	#download_thread.start()
 	upload_thread.start()
+
+	downloadFile(conn, file1)
 
 
 def get(conn, filename, addr):
@@ -26,7 +27,6 @@ def get(conn, filename, addr):
 	sock.send("GET:" + filename, addr) #tell the server what operation we are doing
 	downloadFile(conn,filename)
 
-	
 
 def downloadFile(conn, filename):
 	print "DOWNLOADING FILE"
