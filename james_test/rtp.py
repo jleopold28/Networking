@@ -62,8 +62,11 @@ class RTPSocket:
 		self.SYNqueue = []
 		self.SYNACKqueue = []
 		self.FINqueue = []
+		self.ackList = {}
 
 		self.lock = threading.Lock()
+		self.ackLock = threading.Lock()
+
 		self.recvThread = threading.Thread(target = self.recv)
 		self.recvThread.daemon = True # so the thread will exit when the program exits
 
@@ -102,6 +105,9 @@ class RTPSocket:
 			conn = RTPConnection(dstaddr)
 			with self.lock:
 				self.connections[conn_id] = conn
+
+			with self.ackLock:
+				self.ackList[conn_id] = []
 
 			while True:
 				if conn.isOff == False:
@@ -162,6 +168,8 @@ class RTPSocket:
 
 		with self.lock:		
 			self.connections[conn_id] = conn
+		with self.ackLock:
+			self.ackList[conn_id] = []
 		
 		conn.startConn()
 		#print "returning RTP connection at " + str(conn_id)
@@ -208,8 +216,10 @@ class RTPSocket:
 		t = None
 		self.base = 0 
 		self.nextseqnum = 0
+		self.N = self.rwnd / RTPPacket.MSS
+
 		while 1:
-			while (self.nextseqnum < self.base + self.rwnd) and self.nextseqnum < len(self.packetList):	
+			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
@@ -223,9 +233,10 @@ class RTPSocket:
 
 			#FIRST THING! - lock this? response, rcv_address = self.sock.recvfrom(1000) # replace with rwnd
 
-			with self.lock:
-				if self.connections[addr[1]].foo():
-					packet = self.connections[addr[1]].getACK()
+			with self.ackLock:
+				if self.ackList[addr[1]] != []:
+					#if self.connections[addr[1]].foo():
+					packet = self.ackList[addr[1]].pop(0)
 					header = packet.header
 					#print "GOT ACK FOR: " + str(packet)
 					self.base = header.acknum + 1
@@ -251,6 +262,10 @@ class RTPSocket:
 		Retransmits packets from base to nextseqnum-1
 		addr: tuple (host, port)
 		"""
+		#print "TIMEOUT"
+		#print self.base
+		#print self.nextseqnum
+
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
@@ -289,8 +304,9 @@ class RTPSocket:
 					continue
 				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #ACK
 					#print "GOT ACK"
-					with self.lock:
-						self.connections[rcv_address[1]].addACK(rcvpkt)
+					with self.ackLock:
+						self.ackList[rcv_address[1]].append(rcvpkt)
+						#self.connections[rcv_address[1]].addACK(rcvpkt)
 					continue
 				# if data was received:
 				elif rcvpkt and header.ACK == 0 and header.checksum == rcvpkt.getChecksum(): #we got data AND not corrupt
@@ -406,9 +422,9 @@ class RTPSocket:
 		#self.setTimeout()
 		while 1:
 			try:
-				with self.lock:
-					if self.connections[addr[1]].foo():
-						packet = self.connections[addr[1]].getACK()
+				with self.ackLock:
+					if self.ackList[addr[1]] != []:
+						packet = self.ackList[addr[1]].pop(0)
 						header = packet.header
 						break
 			except socket.error:
@@ -476,9 +492,9 @@ class RTPSocket:
 		# wait for ACK
 		#self.setTimeout()
 		while 1:
-			with self.lock:
-				if self.connections[dstaddr[1]].foo():
-					packet = self.connections[dstaddr[1]].getACK()
+			with self.ackLock:
+				if self.ackList[dstaddr[1]] != []:
+					packet = self.ackList[dstaddr[1]].pop(0)
 					header = packet.header
 					break
 

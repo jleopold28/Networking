@@ -48,6 +48,7 @@ def downloadFile(conn, filename):
 			continue
 	ofile.close()
 	print "FINSHED DOWNLOADING\n"
+	return
 
 def uploadFile(filename, addr):
 	"""Uploads file to server."""

@@ -38,10 +38,11 @@ def get_post(conn, addr, file1, file2):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 
 	upload_thread = threading.Thread(target = uploadFile, args = (file1, addr))
-	download_thread = threading.Thread(target = downloadFile, args = (conn, file2))
-
+	#download_thread = threading.Thread(target = downloadFile, args = (conn, file2))
 	upload_thread.start()
-	download_thread.start()
+	#download_thread.start()
+
+	downloadFile(conn,file2)
 
 def get(filename, addr):
 	get_thread = threading.Thread(target = uploadFile, args = (filename, addr))
@@ -76,6 +77,8 @@ def uploadFile(filename, addr):
 		print e
 		raise
 
+	return
+
 def downloadFile(conn, filename):
 	extensionList = filename.split(".")
 	ofile = open("post_G_" + extensionList[0] +"."+ extensionList[1], "wb") # open in write bytes mode
@@ -95,6 +98,7 @@ def downloadFile(conn, filename):
 			continue
 
 	ofile.close()
+	return
 
 def main(argv):
 	"""Main method to start FTA server."""
@@ -125,7 +129,7 @@ def main(argv):
 				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
 				newthread.start()
 
-		sock.close()
+		#sock.close()
 	except Exception, e:
 		print "Error"
 		print e
