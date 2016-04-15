@@ -25,6 +25,7 @@ def get(conn, filename, addr):
 	"""Downloads file from server."""
 	sock.send("GET:" + filename, addr) #tell the server what operation we are doing
 	downloadFile(conn,filename)
+
 	
 
 def downloadFile(conn, filename):
@@ -47,7 +48,6 @@ def downloadFile(conn, filename):
 			continue
 	ofile.close()
 	print "FINSHED DOWNLOADING\n"
-	return
 
 def uploadFile(filename, addr):
 	"""Uploads file to server."""
@@ -82,12 +82,16 @@ def main(argv):
 		print "Wrong number of arguments.\npython ftaclient.py $HOST:$PORT $RWND"
 		sys.exit(1)
 
-
-	arg0 = argv[0].split(":")
-	host = arg0[0]
-	port = int(arg0[1])
-	rwnd = int(argv[1])
-
+	# parse command line arguments
+	try:
+		arg0 = argv[0].split(":")
+		host = arg0[0]
+		port = int(arg0[1])
+		rwnd = int(argv[1])
+	except:
+		print "Invalid argument(s).\npython ftaclient.py $HOST:$PORT $RWND"
+		sys.exit(1)
+	
 	disconnect = False
 
 	global sock

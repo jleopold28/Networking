@@ -103,9 +103,14 @@ def main(argv):
 		print "Wrong number of arguments.\npython ftaserver.py $PORT $RWND"
 		sys.exit(1)
 
-	port = int(argv[0])
-	rwnd = int(argv[1])
-	host = '127.0.0.1'
+	# parse command line arguments
+	try:
+		port = int(argv[0])
+		rwnd = int(argv[1])
+		host = '127.0.0.1'
+	except:
+		print "Invalid command line argument(s).\npython ftaserver.py $PORT $RWND"
+		sys.exit(1)
 
 	# create socket and bind to port
 	try:
@@ -125,6 +130,7 @@ def main(argv):
 		print "Error"
 		print e
 		raise # for debugging
+		#sys.exit(1) # uncomment if we want the server to shut down on error
 		
  
 
