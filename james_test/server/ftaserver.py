@@ -17,13 +17,14 @@ def clientSession(conn, addr):
 		if data:
 			if data == "CLOSE CONNECTION":
 				sock.serverClose(conn)
-				return
+				print "CLOSEING SESSION FOR " + str(addr)
+				break
 			#determine which command we are doing and whith what filename
 			dataList = data.split(":")
 			command = dataList[0]
 			if command == "GET":
 				filename = dataList[1]
-				get(conn, addr, filename)
+				get(filename, addr)
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
@@ -31,36 +32,23 @@ def clientSession(conn, addr):
 			else:
 				error_msg = "INVALID COMMAND"
 				sock.send(error_msg, addr)
+	return
 
-def get_post(file1, file2, host, port):
+def get_post(conn, file1, file2, addr):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
-	#need to implement threading here
 
-	upload_thread = threading.Thread(target = uploadFile, args = (file1, host, port))
-	download_thread = threading.Thread(target = downloadFile, args = (file2, host, port))
+	upload_thread = threading.Thread(target = uploadFile, args = (file1, addr))
+	download_thread = threading.Thread(target = downloadFile, args = (conn, file2))
 
 	upload_thread.start()
 	download_thread.start()
 
-	#with lock:
-	#	upload_thread.join()
-	#	download_thread.join()
-	#download_thread = threading.Thread(target = downloadFile, args = (file2, sock, host, port, rwnd))
-	#download_thread.start()
-	#upload_thread.join()
+def get(filename, addr):
+	get_thread = threading.Thread(target = uploadFile, args = (filename, addr))
+	get_thread.start()
 
-	#uploadFile(file1, sock, host, port, rwnd)
-	#downloadFile(file2, sock, host, port, rwnd)
-	#pass
-
-def get(conn, addr, filename):
-	#upload_thread = threading.Thread(target = uploadFile, args = (filename, sock, host, port, rwnd))
-	#upload_thread.start()
-	#upload_thread.join()
-	uploadFile(conn, addr, filename)
-
-def uploadFile(conn, addr, filename):
-	print "UPLOADING FILE"
+def uploadFile(filename, addr):
+	#print "UPLOADING FILE"
 	"""Uploads file to client. Called whenever filename is received from server."""
 	# check if file exists
 	files = [f for f in os.listdir(".") if os.path.isfile(f)]
@@ -68,7 +56,7 @@ def uploadFile(conn, addr, filename):
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
 		sock.send(error_msg, addr)
-		send_file = None
+		return
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
 
@@ -79,7 +67,7 @@ def uploadFile(conn, addr, filename):
 
 		sock.send("EOF", addr)
 		
-		print "Sent file to client"
+		print "Sent file to client "
 
 	except Exception, e:
 		if send_file:
@@ -88,9 +76,9 @@ def uploadFile(conn, addr, filename):
 		print e
 		raise
 
-def downloadFile(conn, addr, filename):
+def downloadFile(conn, filename):
 	extensionList = filename.split(".")
-	ofile = open("post_G." + extensionList[1], "wb") # open in write bytes mode
+	ofile = open("post_G_" + extensionList[0] +"."+ extensionList[1], "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
 		data = conn.getData()
@@ -128,7 +116,7 @@ def main(argv):
 		while 1:
 			#check the SYN QUE in ACCEPT
 			conn, addr = sock.accept()
-			if (conn, addr) != ("",""):
+			if (conn, addr) != ( "","" ):
 				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
 				newthread.start()
 
