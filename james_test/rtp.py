@@ -223,6 +223,7 @@ class RTPSocket:
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
+				
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
 					if t != None: #is there is a timer running, stop it

@@ -38,15 +38,19 @@ def get_post(conn, addr, file1, file2):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 
 	upload_thread = threading.Thread(target = uploadFile, args = (file1, addr))
-	#download_thread = threading.Thread(target = downloadFile, args = (conn, file2))
-	upload_thread.start()
-	#download_thread.start()
+	download_thread = threading.Thread(target = downloadFile, args = (conn, file2))
 
-	downloadFile(conn,file2)
+	upload_thread.start()
+	download_thread.start()
+
+	upload_thread.join()
+	download_thread.join() #dont contiunue until both finishe
+
 
 def get(filename, addr):
 	get_thread = threading.Thread(target = uploadFile, args = (filename, addr))
 	get_thread.start()
+	get_thread.join()
 
 def uploadFile(filename, addr):
 	#print "UPLOADING FILE"
