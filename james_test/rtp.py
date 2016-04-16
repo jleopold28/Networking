@@ -55,7 +55,8 @@ class RTPSocket:
 		self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
 
 		self.rwnd = None
-		self.N = 5
+		self.cwnd = 1 # initially set cwnd to 1 (this replaces self.N)
+		self.ssthresh = 128 # this will be reset after first loss event
 		self.server_isn = None
 
 		self.SYNqueue = []
@@ -76,6 +77,7 @@ class RTPSocket:
 		self.recvThread = threading.Thread(target = self.recv)
 		self.recvThread.daemon = True # so the thread will exit when the program exits
 
+		#self.sock.settimeout(2)
 
 	def bind(self, socket_addr):
 		self.socket_addr = socket_addr
@@ -228,10 +230,16 @@ class RTPSocket:
 		t = None
 		self.base = 0 
 		self.nextseqnum = 0
-		self.N = self.rwnd / RTPPacket.MSS
+		# keep congestion window smaller than receive window
+		if self.cwnd > self.rwnd:
+			self.cwnd = self.rwnd
 
+		# set the number of packets that can be sent
+		self.N = self.cwnd
 		while 1:
 			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
+				self.N = self.cwnd
+				print "Sending packet, self.N = " + str(self.N)
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
@@ -247,6 +255,15 @@ class RTPSocket:
 			if self.ackList[addr[1]] != []:
 				with self.ackLock: #lock becuase we are removing data
 					packet = self.ackList[addr[1]].pop(0)
+
+				# increase cwnd because ACK was received
+				if self.cwnd < self.ssthresh:
+					self.cwnd = self.cwnd * 2
+				elif self.cwnd < self.rwnd:
+					self.cwnd += 1
+				else:
+					self.cwnd = self.rwnd
+				print "Received ACK, self.cwnd: " + str(self.cwnd)
 				header = packet.header
 				self.base = header.acknum + 1
 				for i in range(0, self.base): #cumulative ACK
@@ -271,11 +288,26 @@ class RTPSocket:
 		Retransmits packets from base to nextseqnum-1
 		addr: tuple (host, port)
 		"""
+		print "\nTIMEOUT\n"
+		# loss event occurred, so reset ssthresh and cwnd
+		self.ssthresh = self.cwnd / 2 # set to 1/2 initial value of cwnd
+		self.cwnd = 1 # TCP Tahoe
+
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
-		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
-			packetToSend = self.packetList[i]
-			self.sock.sendto(packetToSend.makeBytes(), addr)
+		if self.cwnd > len(self.packetList):
+			for i in range(self.base, self.base + self.cwnd): #range doesnt include last value so take out the minus 1
+				packetToSend = self.packetList[i]
+				self.sock.sendto(packetToSend.makeBytes(), addr)
+			self.nextseqnum += 1
+			t.cancel()
+		else:
+			for i in range(self.base, len(self.packetList)):
+				packetToSend = self.packetList[i]
+				self.sock.sendto(packetToSend.makeBytes(), addr)
+			self.nextseqnum += 1
+			t.cancel()
+
 
 	def recv(self):
 		"""Receives data at a socket and returns data, address."""
@@ -352,7 +384,13 @@ class RTPSocket:
 
 	def sendACK(self, srcport, dstaddr, seqnum, acknum):
 		"""Sends an ACK packet with scrport, dstport, seqnum, acknum to addr."""
-		# make ACK packet
+		
+		# REMOVE THIS - here to simulate dropped ACKs ============
+		rand = random.randint(0, 10)
+		if rand == 6:
+			return
+		# ========================================================
+
 		dstport = dstaddr[1]
 		ACK = 1
 		SYN = 0
