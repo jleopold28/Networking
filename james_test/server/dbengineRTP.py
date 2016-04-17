@@ -5,6 +5,7 @@ sys.path.insert(0,'..')
 from rtp import *
 
 sock = None
+db = {}
 
 def clientSession(conn,addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
@@ -16,50 +17,55 @@ def clientSession(conn,addr):
 				print "CLOSEING SESSION FOR " + str(addr) + "\n"
 				break
 			elif data:
-				dataList = data.split(":") #split the query and cols by colon
-				query = dataList[0].strip()
+				thread = threading.Thread(target = response, args = (data, addr))
+				thread.start()
+				thread.join()
 
-				if query not in db.keys():
-					# if the client requests an ID that we do not have, we send the error message
-					sock.send("Error: ID " + query + " not in the database!", addr)
-					continue
+	return
 
-				cols = dataList[1].split(",") #cols are comma delimited
-				#initialize our response
-				response = "From server: "
-				for col in cols:
-					col = col.strip()
-					if col == "first_name":
-						response = response + col + ": " + db[query][0]
-					elif col == "last_name":
-						response = response + col + ": " + db[query][1]
-					elif col == "quality_points":
-						response = response + col + ": " + db[query][2]
-					elif col == "gpa_hours":
-						response = response + col + ": " + db[query][3]
-					elif col == "gpa":
-						response = response + col + ": " + db[query][4]
-					else:
-						sock.send("Error: Client referring to a non-existing attribute - " + col,addr)
-						continue
+def response(data, addr):
+	dataList = data.split(":") #split the query and cols by colon
+	query = dataList[0].strip()
 
-					if col != cols[len(cols) - 1].strip():
-							response = response + ", " #do not add a comma for the last element
+	if query not in db.keys():
+		# if the client requests an ID that we do not have, we send the error message
+		sock.send("Error: ID " + query + " not in the database!", addr)
+		return
 
-					if response[:5] == "Error":
-						s.send(response, addR)
-						continue
-					else:
-						s.send(response, addr)
-						continue
+	cols = dataList[1].split(",") #cols are comma delimited
+	#initialize our response
+	response = "From server: "
+	for col in cols:
+		col = col.strip()
+		if col == "first_name":
+			response = response + col + ": " + db[query][0]
+		elif col == "last_name":
+			response = response + col + ": " + db[query][1]
+		elif col == "quality_points":
+			response = response + col + ": " + db[query][2]
+		elif col == "gpa_hours":
+			response = response + col + ": " + db[query][3]
+		elif col == "gpa":
+			response = response + col + ": " + db[query][4]
+		else:
+			sock.send("Error: Client referring to a non-existing attribute - " + col,addr)
+			return
 
+		if col != cols[len(cols) - 1].strip():
+				response = response + ", " #do not add a comma for the last element
+
+		if response[:5] == "Error":
+			sock.send(response, addr)
+		else:
+			sock.send(response, addr)
 	return
 
 def main(argv):
 	server_host = '127.0.0.1'
 	server_port = int(argv[1])
 	#initialize our database
-	db = {} #format of db: {'ID' : ['first_name', 'last_name', 'quality_points', 'gpa_hours', 'gpa']}
+	global db
+	#db = {} #format of db: {'ID' : ['first_name', 'last_name', 'quality_points', 'gpa_hours', 'gpa']}
 
 	f = open("db.csv")
 	#open the csv file holding the data
@@ -73,7 +79,7 @@ def main(argv):
 
 	try:
 		#INITIALIZATION
-
+		global sock
 		sock = RTPSocket() #create only 1 socket
 		sock.rwnd = 512
 		sock.bind((server_host, server_port))
@@ -86,7 +92,7 @@ def main(argv):
 
 		#TERMINATION
 		#This is unreachable becuase crtl-c does not terminate the while loop, instead you must close the window
-		s.serverClose()
+		#sock.serverClose()
 	except Exception, e:
 		#if we find an exception above, we print error message
 		print "Error accessing the server, please try again"

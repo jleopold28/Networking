@@ -9,13 +9,13 @@ sock = None
 
 def main(argv):
 	#split the first arument by colon
-	hostPortList = sys.argv[1].split(":")
+	hostPortList = argv[1].split(":")
 	#extract the server_host
 	server_host = hostPortList[0]
 	#extract the server_port
 	server_port = int(hostPortList[1])
 	#extract the query (ID)
-	query = sys.argv[2]
+	query = argv[2]
 	cols = "" #string to hold the cols requested
 
 	for i in range(3, len(sys.argv)): #iterate over the remaining arguments
@@ -58,8 +58,11 @@ def main(argv):
 			tries = tries - 1
 
 		#TERMINATION
+		print data
 		#close the socket
-		sock.clientClose()
+		sock.send("CLOSE CONNECTION", (server_host, server_port))
+		sock.clientClose(conn)
+		
 	except Exception, e:
 		#if there is an error, print error message
 		print e
