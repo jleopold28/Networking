@@ -386,9 +386,9 @@ class RTPSocket:
 		"""Sends an ACK packet with scrport, dstport, seqnum, acknum to addr."""
 		
 		# REMOVE THIS - here to simulate dropped ACKs ============
-		rand = random.randint(0, 10)
-		if rand == 6:
-			return
+		#rand = random.randint(0, 10)
+		#if rand == 6:
+		#	return
 		# ========================================================
 
 		dstport = dstaddr[1]
