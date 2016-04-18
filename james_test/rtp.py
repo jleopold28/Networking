@@ -61,7 +61,8 @@ class RTPSocket:
 	def __init__(self):
 		"""Constructs a new RTPConnection."""
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
+		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		#self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_NO_CHECK, 1)
 
 		self.server_isn = None
 		self.rwnd = None
@@ -249,17 +250,18 @@ class RTPSocket:
 		#	self.connections[addr].cwnd = self.connections[addr].rwnd
 
 		# set the number of packets that can be sent
-		self.N = min(self.connections[addr].rwnd / RTPPacket.MSS , self.connections[addr].cwnd / RTPPacket.MSS)
+		self.N = min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS
 
 
 		while 1:
 			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
-				print "Sending packet, self.N = " + str(self.N)
+				#print "Sending packet, self.N = " + str(self.N)
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
-				self.N = min(self.connections[addr].rwnd / RTPPacket.MSS, self.connections[addr].cwnd / RTPPacket.MSS)
+				self.N = min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS
+
 				if(self.base == self.nextseqnum):
 					if t != None: #is there is a timer running, stop it
 						t.cancel()
