@@ -477,9 +477,9 @@ class RTPSocket:
 		while 1:
 			try:
 				# wait for FIN bit and pop from FIN queue]
-				if self.finList[addr[1]] != []:
+				if self.finList[addr] != []:
 					with self.finLock:
-						finPacket = self.finList[addr[1]].pop(0) # get first FIN but do not remove from queue
+						finPacket = self.finList[addr].pop(0) # get first FIN but do not remove from queue
 					header = finPacket.header
 					break
 
