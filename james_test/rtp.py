@@ -109,8 +109,10 @@ class RTPSocket:
 			# accept is server side so I think we need to create the connection object at the client address
 			# then in connect we already have the connection in self.connections and just need to set conn.isOff = False
 
-			conn_id = dstaddr[1] 				# now identify by the client port! #random.randint(0,100000)
+			conn_id = (dstaddr[0], dstaddr[1])
+			#conn_id = dstaddr[1] 				# now identify by the client port! #random.randint(0,100000)
 			conn = RTPConnection(dstaddr)
+
 			with self.connLock:
 				self.connections[conn_id] = conn
 
@@ -175,7 +177,7 @@ class RTPSocket:
 		self.sendACK(self.socket_port, destination_address, seqnum, acknum)
 
 		conn = RTPConnection(destination_address)
-		conn_id = destination_address[1]
+		conn_id = (destination_address[0], destination_address[1])
 
 		with self.connLock:		
 			self.connections[conn_id] = conn
@@ -332,22 +334,22 @@ class RTPSocket:
 					continue
 				elif header.FIN == 1 and header.checksum == rcvpkt.getChecksum(): #FIN
 					with self.finLock:
-						self.finList[rcv_address[1]].append(rcvpkt)
+						self.finList[rcv_address.append(rcvpkt)
 					continue
 				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1) and header.checksum == rcvpkt.getChecksum(): 
 					with self.connLock:
-						self.connections[rcv_address[1]].startConn()
+						self.connections[rcv_address.startConn()
 					self.server_isn = None
 					continue
 				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #GOT ACK
 					with self.ackLock:
-						self.ackList[rcv_address[1]].append(rcvpkt)
+						self.ackList[rcv_address].append(rcvpkt)
 					continue
 				elif rcvpkt and header.ACK == 0 and header.checksum == rcvpkt.getChecksum(): #we got data AND not corrupt
 					rcv_port = rcv_address[1]
 					if rcvpkt.header.seqnum == expectedseqnum:
 						with self.connLock:
-							self.connections[rcv_port].addData(rcvpkt.data)
+							self.connections[rcv_address].addData(rcvpkt.data)
 						seqnum = rcvpkt.header.acknum
 						self.sendACK(self.socket_port, rcv_address, seqnum, expectedseqnum)
 						last_acknum_sent = expectedseqnum
@@ -526,7 +528,7 @@ class RTPSocket:
 		# close connection
 		conn.isOff = True
 		with self.connLock:
-			del self.connections[conn.dst_port]# remove conn from self.connections
+			del self.connections[dstaddr]# remove conn from self.connections
 
 
 	def getPacket(self, bytes):
