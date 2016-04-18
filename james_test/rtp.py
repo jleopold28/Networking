@@ -269,7 +269,7 @@ class RTPSocket:
 
 			if self.ackList[addr] != []:
 				with self.ackLock: #lock becuase we are removing data
-					packet = self.ackList[addr[1]].pop(0)
+					packet = self.ackList[addr].pop(0)
 
 				# increase cwnd because ACK was received
 				if self.connections[addr].cwnd < self.connections[addr].ssthresh:
@@ -505,9 +505,9 @@ class RTPSocket:
 		dstaddr = conn.dst_addr
 
 		while 1:
-			if self.finList[dstaddr[1]] != []:
+			if self.finList[dstaddr] != []:
 				with self.finLock:
-					finPacket = self.finList[dstaddr[1]].pop(0)
+					finPacket = self.finList[dstaddr].pop(0)
 				header = finPacket.header
 				break
 
