@@ -239,8 +239,8 @@ class RTPSocket:
 		self.base = 0 
 		self.nextseqnum = 0
 		# keep congestion window smaller than receive window
-		if self.connections[addr].cwnd > self.rwnd:
-			self.connections[addr].cwnd = self.rwnd
+		if self.connections[addr].cwnd > self.connections[addr].rwnd:
+			self.connections[addr].cwnd = self.connections[addr].rwnd
 
 		# set the number of packets that can be sent
 		self.N = self.connections[addr].cwnd
@@ -267,10 +267,10 @@ class RTPSocket:
 				# increase cwnd because ACK was received
 				if self.connections[addr].cwnd < self.connections[addr].ssthresh:
 					self.connections[addr].cwnd = self.connections[addr].cwnd * 2
-				elif self.connections[addr].cwnd < self.rwnd:
+				elif self.connections[addr].cwnd < self.connections[addr].rwnd:
 					self.connections[addr].cwnd += 1
 				else:
-					self.connections[addr].cwnd = self.rwnd
+					self.connections[addr].cwnd = self.connections[addr].rwnd
 				print "Received ACK, cwnd: " + str(self.connections[addr].cwnd)
 				header = packet.header
 				self.base = header.acknum + 1
