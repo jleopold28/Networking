@@ -17,6 +17,13 @@ class RTPConnection:
 		self.dst_port = destination_address[1]
 		self.isOff = True
 
+		# Receiver window for flow control
+		self.rwnd = None # will be initialized in connect
+
+		# Congestion control variables
+		self.cwnd = 1 # initially set cwnd to 1 (this replaces self.N)
+		self.ssthresh = 128 # this will be reset after first loss event
+
 		self.data = ""
 
 	def getData(self):
@@ -54,10 +61,8 @@ class RTPSocket:
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
 
-		self.rwnd = None
-		self.cwnd = 1 # initially set cwnd to 1 (this replaces self.N)
-		self.ssthresh = 128 # this will be reset after first loss event
 		self.server_isn = None
+		self.rwnd = None
 
 		self.SYNqueue = []
 		self.SYNACKqueue = []
@@ -112,6 +117,7 @@ class RTPSocket:
 			conn_id = (dstaddr[0], dstaddr[1])
 			#conn_id = dstaddr[1] 				# now identify by the client port! #random.randint(0,100000)
 			conn = RTPConnection(dstaddr)
+			conn.rwnd = self.rwnd # set rwnd for the connection
 
 			with self.connLock:
 				self.connections[conn_id] = conn
@@ -233,14 +239,14 @@ class RTPSocket:
 		self.base = 0 
 		self.nextseqnum = 0
 		# keep congestion window smaller than receive window
-		if self.cwnd > self.rwnd:
-			self.cwnd = self.rwnd
+		if self.connections[addr].cwnd > self.rwnd:
+			self.connections[addr].cwnd = self.rwnd
 
 		# set the number of packets that can be sent
-		self.N = self.cwnd
+		self.N = self.connections[addr].cwnd
 		while 1:
 			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
-				self.N = self.cwnd
+				self.N = self.connections[addr].cwnd
 				print "Sending packet, self.N = " + str(self.N)
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
@@ -259,13 +265,13 @@ class RTPSocket:
 					packet = self.ackList[addr[1]].pop(0)
 
 				# increase cwnd because ACK was received
-				if self.cwnd < self.ssthresh:
-					self.cwnd = self.cwnd * 2
-				elif self.cwnd < self.rwnd:
-					self.cwnd += 1
+				if self.connections[addr].cwnd < self.connections[addr].ssthresh:
+					self.connections[addr].cwnd = self.connections[addr].cwnd * 2
+				elif self.connections[addr].cwnd < self.rwnd:
+					self.connections[addr].cwnd += 1
 				else:
-					self.cwnd = self.rwnd
-				print "Received ACK, self.cwnd: " + str(self.cwnd)
+					self.connections[addr].cwnd = self.rwnd
+				print "Received ACK, cwnd: " + str(self.connections[addr].cwnd)
 				header = packet.header
 				self.base = header.acknum + 1
 				for i in range(0, self.base): #cumulative ACK
@@ -292,13 +298,13 @@ class RTPSocket:
 		"""
 		print "\nTIMEOUT\n"
 		# loss event occurred, so reset ssthresh and cwnd
-		self.ssthresh = self.cwnd / 2 # set to 1/2 initial value of cwnd
-		self.cwnd = 1 # TCP Tahoe
+		self.connections[addr].ssthresh = self.connections[addr].cwnd / 2 # set to 1/2 initial value of cwnd
+		self.connections[addr].cwnd = 1 # TCP Tahoe
 
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
-		if self.cwnd > len(self.packetList):
-			for i in range(self.base, self.base + self.cwnd): #range doesnt include last value so take out the minus 1
+		if self.connections[addr].cwnd > len(self.packetList):
+			for i in range(self.base, self.base + self.connections[addr].cwnd): #range doesnt include last value so take out the minus 1
 				packetToSend = self.packetList[i]
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 			self.nextseqnum += 1
