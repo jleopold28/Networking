@@ -53,6 +53,14 @@ I. How RTP works
         2. eom: 
             This stands for "end of message" and is a RTP header field. If eom=1, the packet is the last packet in a message so the receiver knows to return the message data to the application layer.
 
+    H. Packet Losses
+
+    I. Re-ordered Packets
+
+    J. Corrupted Packets
+
+    K. Congestion Control
+
 II. RTP header structure and header fields
     The RTP header consists of the following fields:
     +=============+==========+======+==================================+

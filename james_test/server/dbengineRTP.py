@@ -48,16 +48,15 @@ def response(data, addr):
 		elif col == "gpa":
 			response = response + col + ": " + db[query][4]
 		else:
-			sock.send("Error: Client referring to a non-existing attribute - " + col,addr)
+			# if column is invalid: send error message instead
+			response = "From server: Error: Client referring to a non-existing attribute - " + col
+			sock.send(response, addr)
 			return
 
 		if col != cols[len(cols) - 1].strip():
 				response = response + ", " #do not add a comma for the last element
 
-		if response[:5] == "Error":
-			sock.send(response, addr)
-		else:
-			sock.send(response, addr)
+	sock.send(response, addr)
 	return
 
 def main(argv):
