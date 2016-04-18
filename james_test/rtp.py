@@ -267,7 +267,7 @@ class RTPSocket:
 					t.start()
 				self.nextseqnum += 1
 
-			if self.ackList[addr[1]] != []:
+			if self.ackList[addr] != []:
 				with self.ackLock: #lock becuase we are removing data
 					packet = self.ackList[addr[1]].pop(0)
 
@@ -338,11 +338,11 @@ class RTPSocket:
 					continue
 				elif header.FIN == 1 and header.checksum == rcvpkt.getChecksum(): #FIN
 					with self.finLock:
-						self.finList[rcv_address.append(rcvpkt)
+						self.finList[rcv_address].append(rcvpkt)
 					continue
 				elif self.server_isn != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.server_isn + 1) and header.checksum == rcvpkt.getChecksum(): 
 					with self.connLock:
-						self.connections[rcv_address.startConn()
+						self.connections[rcv_address].startConn()
 					self.server_isn = None
 					continue
 				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #GOT ACK
@@ -462,9 +462,9 @@ class RTPSocket:
 		#self.setTimeout()
 		while 1:
 			try:
-				if self.ackList[addr[1]] != []:
+				if self.ackList[addr] != []:
 					with self.ackLock:
-						packet = self.ackList[addr[1]].pop(0) #lock becuase we are modifying data
+						packet = self.ackList[addr].pop(0) #lock becuase we are modifying data
 
 					header = packet.header
 					break
@@ -523,9 +523,9 @@ class RTPSocket:
 		# wait for ACK
 		#self.setTimeout()
 		while 1:
-			if self.ackList[dstaddr[1]] != []:
+			if self.ackList[dstaddr] != []:
 				with self.ackLock:
-					packet = self.ackList[dstaddr[1]].pop(0)
+					packet = self.ackList[dstaddr].pop(0)
 				header = packet.header
 				break
 
