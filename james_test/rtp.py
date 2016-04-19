@@ -7,6 +7,7 @@ import struct
 import threading 
 import time
 import sys
+import math
 
 class RTPConnection:
 	"""Represents a connection over RTP"""
@@ -23,7 +24,7 @@ class RTPConnection:
 
 		# Congestion control variables
 		self.cwnd = RTPPacket.MSS # initially set cwnd to 1 (this replaces self.N)
-		self.ssthresh = 128 # this will be reset after first loss event, 128 packets!
+		self.ssthresh = 25000  # 25KB  # this will be reset after first loss event, 128 packets!
 
 		self.data = ""
 
@@ -250,7 +251,7 @@ class RTPSocket:
 		#	self.connections[addr].cwnd = self.connections[addr].rwnd
 
 		# set the number of packets that can be sent
-		self.N = min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS
+		self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
 
 
 		while 1:
@@ -260,7 +261,7 @@ class RTPSocket:
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
-				self.N = min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS
+				self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
 
 				if(self.base == self.nextseqnum):
 					if t != None: #is there is a timer running, stop it
@@ -279,7 +280,7 @@ class RTPSocket:
 				else :                                  #self.connections[addr].cwnd < self.connections[addr].rwnd:
 					self.connections[addr].cwnd = self.connections[addr].cwnd + RTPPacket.MSS
 
-				print "Received ACK, cwnd: " + str(self.connections[addr].cwnd)
+				#print "Received ACK, cwnd: " + str(self.connections[addr].cwnd)
 				header = packet.header
 				self.base = header.acknum + 1
 				for i in range(0, self.base): #cumulative ACK
@@ -307,8 +308,9 @@ class RTPSocket:
 		print "\nTIMEOUT\n"
 		# loss event occurred, so reset ssthresh and cwnd
 
-		self.connections[addr].ssthresh = self.connections[addr].cwnd / 2 # set to 1/2 initial value of cwnd
-		self.connections[addr].cwnd = RTPPacket.MSS
+		with self.connLock:
+			self.connections[addr].ssthresh = self.connections[addr].cwnd / 2 # set to 1/2 initial value of cwnd
+			self.connections[addr].cwnd = RTPPacket.MSS
 
 		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 		t.start()
