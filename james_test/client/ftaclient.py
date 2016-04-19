@@ -13,8 +13,10 @@ lock = threading.Lock()
 def get_post(conn, file1, file2, addr):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	command = "GET-POST"
+	
 	with lock:
 		sock.send(command + ":" + file1 + ":" + file2, addr)
+
 
 	download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, addr))
@@ -29,9 +31,10 @@ def get(conn, filename, addr):
 	"""Downloads file from server."""
 	with lock:
 		sock.send("GET:" + filename, addr) #tell the server what operation we are doing
-	get_thread = threading.Thread(target = downloadFile, args = (conn, filename))
-	get_thread.start()
-	get_thread.join()
+	#get_thread = threading.Thread(target = downloadFile, args = (conn, filename))
+	#get_thread.start()
+	#get_thread.join()
+	downloadFile(conn,filename)
 
 def downloadFile(conn, filename):
 	print "DOWNLOADING FILE"
@@ -135,7 +138,8 @@ def main(argv):
 				continue
 			try:
 				get_post(conn, f, g, (host, port))
-			except:
+			except Exception,e:
+				print e
 				print "Error downloading or uploading file."
 
 		elif "get" in command:

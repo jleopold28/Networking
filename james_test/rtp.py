@@ -289,10 +289,10 @@ class RTPSocket:
 						cwnd = self.connections[addr].cwnd
 						self.connections[addr].cwnd = cwnd + RTPPacket.MSS*(RTPPacket.MSS/cwnd)
 
-				print "Received ACK"
-				print "cwnd: " + str(self.connections[addr].cwnd)
-				print "rwnd: " + str(self.connections[addr].rwnd)
-				print "N: " + str(self.N)
+				#print "Received ACK"
+				#print "cwnd: " + str(self.connections[addr].cwnd)
+				#print "rwnd: " + str(self.connections[addr].rwnd)
+				#print "N: " + str(self.N)
 
 				header = packet.header
 				self.base = header.acknum + 1

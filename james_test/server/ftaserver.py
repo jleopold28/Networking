@@ -18,7 +18,7 @@ def clientSession(conn, addr):
 		if data:
 			if data == "CLOSE CONNECTION":
 				sock.serverClose(conn)
-				print "CLOSEING SESSION FOR " + str(addr) + "\n"
+				print "CLOSING SESSION FOR " + str(addr) + "\n"
 				break
 			#determine which command we are doing and whith what filename
 			dataList = data.split(":")
