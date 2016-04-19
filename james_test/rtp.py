@@ -276,9 +276,10 @@ class RTPSocket:
 
 				# increase cwnd because ACK was received
 				if self.connections[addr].cwnd < self.connections[addr].ssthresh:
-					self.connections[addr].cwnd = self.connections[addr].cwnd * 2
-				else :                                  #self.connections[addr].cwnd < self.connections[addr].rwnd:
 					self.connections[addr].cwnd = self.connections[addr].cwnd + RTPPacket.MSS
+				else :                                  #self.connections[addr].cwnd < self.connections[addr].rwnd:
+					cwnd = self.connections[addr].cwnd
+					self.connections[addr].cwnd = cwnd + RTPPacket.MSS*(RTPPacket.MSS/cwnd )
 
 				#print "Received ACK, cwnd: " + str(self.connections[addr].cwnd)
 				header = packet.header
