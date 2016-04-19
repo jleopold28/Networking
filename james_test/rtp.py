@@ -20,7 +20,7 @@ class RTPConnection:
 
 		# Receiver window for flow control
 		self.rwnd = None # will be initialized in connect
-		self.recBuffer = None
+		self.init_rwnd = None
 
 		# Congestion control variables
 		self.cwnd = RTPPacket.MSS # initially set cwnd to 1 (this replaces self.N)
@@ -32,7 +32,7 @@ class RTPConnection:
 		if self.data:
 			out = self.data
 			self.data = ""
-			self.rwnd = self.recBuffer
+			self.rwnd = self.init_rwnd
 			return out
 		else:
 			return ""
@@ -122,7 +122,7 @@ class RTPSocket:
 			#conn_id = dstaddr[1] 				# now identify by the client port! #random.randint(0,100000)
 			conn = RTPConnection(dstaddr)
 			conn.rwnd = self.rwnd # set rwnd for the connection
-			conn.recBuffer = self.rwnd
+			conn.init_rwnd = self.rwnd
 
 			with self.connLock:
 				self.connections[conn_id] = conn
@@ -189,7 +189,7 @@ class RTPSocket:
 
 		conn = RTPConnection(destination_address)
 		conn.rwnd = self.rwnd
-		conn.recBuffer = self.rwnd
+		conn.init_rwnd = self.rwnd
 
 		conn_id = (destination_address[0], destination_address[1])
 
@@ -251,24 +251,21 @@ class RTPSocket:
 		#	self.connections[addr].cwnd = self.connections[addr].rwnd
 
 		# set the number of packets that can be sent
-		self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
-
-
 		while 1:
+			self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
 			while (self.nextseqnum < self.base + self.N) and self.nextseqnum < len(self.packetList):	
 				#print "Sending packet, self.N = " + str(self.N)
 				packetToSend = self.packetList[self.nextseqnum]
 				#print "SND: " + str(packetToSend)
 				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
-				self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
-
 				if(self.base == self.nextseqnum):
 					if t != None: #is there is a timer running, stop it
 						t.cancel()
 					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
 					t.start()
 				self.nextseqnum += 1
+				self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
 
 			if self.ackList[addr] != []:
 				with self.ackLock: #lock becuase we are removing data
@@ -276,10 +273,12 @@ class RTPSocket:
 
 				# increase cwnd because ACK was received
 				if self.connections[addr].cwnd < self.connections[addr].ssthresh:
-					self.connections[addr].cwnd = self.connections[addr].cwnd + RTPPacket.MSS
-				else :                                  #self.connections[addr].cwnd < self.connections[addr].rwnd:
-					cwnd = self.connections[addr].cwnd
-					self.connections[addr].cwnd = cwnd + RTPPacket.MSS*(RTPPacket.MSS/cwnd )
+					with self.connLock:
+						self.connections[addr].cwnd = self.connections[addr].cwnd + RTPPacket.MSS
+				else:
+					with self.connLock:                             #self.connections[addr].cwnd < self.connections[addr].rwnd:
+						cwnd = self.connections[addr].cwnd
+						self.connections[addr].cwnd = cwnd + RTPPacket.MSS*(RTPPacket.MSS/cwnd)
 
 				#print "Received ACK, cwnd: " + str(self.connections[addr].cwnd)
 				header = packet.header
@@ -359,7 +358,7 @@ class RTPSocket:
 					if rcvpkt.header.seqnum == expectedseqnum:
 						with self.connLock:
 							self.connections[rcv_address].addData(rcvpkt.data)
-							self.connections[rcv_address].rwnd = self.connections[rcv_address].recBuffer - sys.getsizeof(rcvpkt.data) #size of data in bytes
+							self.connections[rcv_address].rwnd = self.connections[rcv_address].rwnd - sys.getsizeof(rcvpkt.data) #size of data in bytes
 						seqnum = rcvpkt.header.acknum
 						self.sendACK(self.socket_port, rcv_address, seqnum, expectedseqnum)
 						last_acknum_sent = expectedseqnum
