@@ -8,11 +8,13 @@ sys.path.insert(0,'..')
 from rtp import *
 
 sock = None
+lock = threading.Lock()
 
 def get_post(conn, file1, file2, addr):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	command = "GET-POST"
-	sock.send(command + ":" + file1 + ":" + file2, addr)
+	with lock:
+		sock.send(command + ":" + file1 + ":" + file2, addr)
 
 	download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, addr))
@@ -25,7 +27,8 @@ def get_post(conn, file1, file2, addr):
 
 def get(conn, filename, addr):
 	"""Downloads file from server."""
-	sock.send("GET:" + filename, addr) #tell the server what operation we are doing
+	with lock:
+		sock.send("GET:" + filename, addr) #tell the server what operation we are doing
 	get_thread = threading.Thread(target = downloadFile, args = (conn, filename))
 	get_thread.start()
 	get_thread.join()
@@ -59,7 +62,8 @@ def uploadFile(filename, addr):
 
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
-		sock.send(error_msg, addr)
+		with lock:
+			sock.send(error_msg, addr)
 		return
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
@@ -67,9 +71,11 @@ def uploadFile(filename, addr):
 	#print "UPLOADING FILE"
 	try:
 		msg = send_file.read() 
-		sock.send(msg, addr)
+		with lock:
+			sock.send(msg, addr)
 		send_file.close()
-		sock.send("EOF", addr)
+		with lock:
+			sock.send("EOF", addr)
 		print "sent file to server"
 	except Exception, e:
 		if send_file:
@@ -106,7 +112,8 @@ def main(argv):
 	while disconnect == False:
 		command = raw_input("> ")
 		if command == "disconnect":
-			sock.send("CLOSE CONNECTION", (host, port)) 
+			with lock:
+				sock.send("CLOSE CONNECTION", (host, port)) 
 			sock.clientClose(conn)
 			print "\n\n"
 			disconnect = True

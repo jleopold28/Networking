@@ -8,6 +8,7 @@ sys.path.insert(0,'..')
 from rtp import *
 
 sock = None
+lock = threading.Lock()
 
 def clientSession(conn, addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
@@ -31,7 +32,8 @@ def clientSession(conn, addr):
 				get_post(conn, addr, file1, file2)
 			else:
 				error_msg = "INVALID COMMAND"
-				sock.send(error_msg, addr)
+				with lock:
+					sock.send(error_msg, addr)
 	return
 
 def get_post(conn, addr, file1, file2):
@@ -60,17 +62,20 @@ def uploadFile(filename, addr):
 
 	if filename not in files:
 		error_msg = "ERROR: FILE NOT FOUND"
-		sock.send(error_msg, addr)
+		with lock:
+			sock.send(error_msg, addr)
 		return
 	else:
 		send_file = open(filename, "rb") #rb to read in binary mode
 
 	try:
 		msg = send_file.read() # read a the entire file
-		sock.send(msg, addr)
+		with lock:
+			sock.send(msg, addr)
 		send_file.close()      # close the file
 
-		sock.send("EOF", addr)
+		with lock:
+			sock.send("EOF", addr)
 		
 		print "Sent file to client "
 
