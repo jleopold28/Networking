@@ -23,17 +23,29 @@ DESIGN DOCUMENTATION
 
 I. How RTP works
     A. Connection establishment
-        RTP establishes a connection with a three-way handshake (similar to TCP). First the server must bind to a port and listen for a SYN from the client. The client requests a connection by sending a SYN to the server with seqnum=client_isn (a randomly generated integer). The server receives the SYN and sends a SYNACK to the client with seqnum=server_isn (randomly generated integer) and acknum=client_isn+1 to grant the connection. Last, the client replies with an ACK to acknowledge the connection. The ACK has seqnum=client_isn+1 and acknum=server_isn+1.
+        RTP establishes a connection with a three-way handshake (similar to TCP). First the server must bind to a port and listen for a SYN from the client (calls the RTPSocket bind method). The client requests a connection (calls the RTPSocket connect method) by sending a SYN to the server with seqnum=client_isn (a randomly generated integer). The server (calling the RTPSocket accept method) receives the SYN and sends a SYNACK to the client with seqnum=server_isn (randomly generated integer) and acknum=client_isn+1 to grant the connection. Last, the client replies with an ACK to acknowledge the connection. The ACK has seqnum=client_isn+1 and acknum=server_isn+1. When the three-way handshake is completed, the server and client each return an RTPConnection object. 
 
     B. Connection termination
-        RTP terminates a connection with a four-way handshake (similar to TCP but with separate clientClose and serverClose methods). The client initiates the connection termination by sending a FIN to the server. The client then starts a timer and waits to receive an ACK from the server indicating that it has received the FIN and will also begin connection termination. Meanwhile, the server has called serverClose because it knows to do so when a FIN packet is received. It sends an ACK to the client, followed by a FIN. When the client receives the ACK from the server, the client then waits for a FIN, and sends an ACK back to the server when the FIN is received. The client waits 2 * the RTT of an RTP packet to make sure the ACK to the server gets received (when this happens, the server closes its side of the connection). Then the client closes its side of the connection. 
+        RTP terminates a connection with a four-way handshake (similar to TCP but with separate clientClose and serverClose methods). The client calls clientClose, which initiates the connection termination by sending a FIN to the server. The client then starts a timer and waits to receive an ACK from the server indicating that it has received the FIN and will also begin connection termination. Meanwhile, the server has called serverClose. After the server receives the client's FIN, it sends an ACK to the client, followed by a FIN. When the client receives the ACK from the server, the client then waits for a FIN, and sends an ACK back to the server when the FIN is received. The client waits 2 * the RTT of an RTP packet to make sure the ACK to the server gets received (when this happens, the server closes its side of the connection). Then the client closes its side of the connection.
+
+        Note: A connection from the client side is terminated by closing the UDP socket (since a client may connect to only one server), while the serverClose method closes a connection by setting the RTPConnection object to off and deleting the RTPConnection from self.connections (the hash map holding all the connections with clients).
 
     C. Flow control
-        RTP provides window-based flow control using the Go-Back-N protocol. Window size, N, is static and is configured when the connection is set up. 
+        Each RTPConnection has a receive window (self.rwnd) which is the number of bytes that may be sent to that connection. If there is no data in the receiver buffer (self.data, the data that has been received in a connection but not yet sent to the application layer), this will be equal to self.recBuffer, which is the maximum number of bytes that may be sent to that connection at a time. If there is data, self.rwnd will be equal to self.recBuffer - sizeof(self.data), that is, the remaining available space in the receiver buffer.
 
-        The sender initially sets two integer variables base and nextseqnum to 0. If nextseqnum is less than base + N, this means the nextseqnum is within the send window, so the packet is sent. Otherwise it is not sent. After a packet is sent, the sender waits for response ACKs from the receiver. When the sender receives a cumulative ACK (indicating all packets up to that acknum have been received), it increments base by the acknum + 1. This moves the send window up to begin sending the next N unACKed packets. If the timer for the first packet in the current send window times out before an ACK is received, the send window remains the same and the packets in that window are re-sent.
+        +===============================+
+        | self.rwnd | sizeof(self.data) |
+        +===============================+
+        <------------------------------->
+                 self.recBuffer
 
-        On the receiver side, when the receiver receives a packet from the sender, it checks if the seqnum of the packet is equal to the seqnum it expects to receive next (expectedseqnum). If so, the packet is appended to the receive buffer, expectedseqnum is incremented by 1 so the next packet can be received, and an ACK is sent for that packet. If the seqnum is not equal to the expectedseqnum the packet is ignored. This prevents packets from being received out of order.
+        The Go-Back-N protocol is used for flow control. Go-Back-N is implemented here as shown in the textbook. For RTP, a congestion window self.cwnd is used on the sender side (see the section on Congestion Control) so self.cwnd is also used to determine N, the number of packets that may be sent at a time.
+
+        SENDER SIDE (RTPSocket send method):
+        The sender initially sets two integer variables self.base and self.nextseqnum to 0. Self.N is initialized as the floor of the minimum of (rwnd of connection, cwnd of connection/MSS). We set self.N to the minimum of the two window sizes to prevent either the sender or receiver buffer from overflowing. If nextseqnum is less than self.base + self.N, this means the nextseqnum is within the send window, so the packet is sent. Otherwise it is not sent. After a packet is sent, the sender waits for response ACKs from the receiver. When the sender receives a cumulative ACK (indicating all packets up to that acknum have been received), it increments base by the acknum + 1. This moves the send window up to begin sending the next N unACKed packets. If the timer for the first packet in the current send window times out before an ACK is received, the send window remains the same and the packets in that window are re-sent.
+
+        RECEIVER SIDE (RTPSocket recv method):
+        On the receiver side, when the receiver receives a packet from the sender, it checks if the seqnum of the packet is equal to the seqnum it expects to receive next (expectedseqnum). If so, the packet is appended to the receive buffer (self.data for the receiving connection), expectedseqnum is incremented by 1 so the next packet can be received, and an ACK is sent for that packet. The size of self.rwnd is recalculated based on the size of the data placed in the buffer. If the seqnum is not equal to the expectedseqnum the packet is ignored. This prevents packets from being received out of order.
 
         If a packet has eom=1, the receiver handles it differently because this indicates that the packet is at the end of a message. Since RTP is connection-oriented, the eom value is used to tell the receiver where one message ends and another begins.
 
@@ -41,7 +53,19 @@ I. How RTP works
         Packets have sequence numbers and acknowledgement numbers. The RTP receiver extracts the data from a packet only if the sequence number of the packet is equal to the expected sequence number (the sequence number of the next packet that should be received). Otherwise, the ACK for the most recently received in-order packet will be re-sent, causing the sender to re-send the packets in the send window. The expected sequence number is incemented by 1 when the expected packet is received and the ACK is sent. If the sender sends a duplicate packet (one that has already been received), the seqnum of that packet will not equal the expected seqnum so the receiver will discard it.
 
     E. De-multiplexing
-        RTP uses connection de-multiplexing to allow multiple clients to communicate with the server simultaneously. This is done with multithreading. When an application is started on the server side, one RTP socket is created and then for each client that connects to that socket, a new RTPCConnection is created in a new thread. The threads allow the connections to all run simultaneously. A lock is used to ensure that the threads do not access the same global variables at the same time. 
+        RTP uses connection de-multiplexing to allow multiple clients to communicate with the server simultaneously. Connections are represented by RTPConnection objects. When a server side application is started using RTP, there is a single UDP socket which can be used to send and receive messages to different clients. Every RTPSocket has the following variables which are used for de-multiplexing messages to different clients:
+
+        self.connections: a hash map containing key-value pairs where the key is the connection id in the form of (host, port) and the value is the RTPConnection object for that address.
+        self.ackList:     a hash map containing key-value pairs where the key is the connection id and the value is a list of ACK packets received for that connection
+        self.finList:     same as self.ackList but for FIN packets
+        self.SYNqueue:    queue of SYN packets received. The connection from which the SYN was received can be determined by the packet header.
+        self.SYNACKqueue: same as self.SYNqueue but for SYNACK packets
+
+        There is also a lock for each of these variables. The lock must be used whenever accessing the variables are accessed, as it prevents them from being modified at the same time by different client threads.
+
+        When an RTPSocket is initialized, the RTP recv function is called in a new thread. This recvThread continues running until the program exits (as it is a daemon thread). Inside the recv function, the RTPSocket continuously receives packets and places them in the appropriate hash maps and queues depending on the connection from which they were received. In the send function, packets are sent to their intended destinations (addr, passed in as an argument) by indexing into self.connections at addr and sending through the connection corresponding to that address.
+
+        A client application will also have a recvThread running with a connection to the server, but since clients don't need to connect to multiple servers there is no demultiplexing to multiple clients (though the client still has a self.connections, etc.)
 
     F. Byte-stream semantics
         RTP assigns sequence numbers to packets to make sure they are delivered in the correct order. When the RTP receiver receives a packet it sends an ACK to the sender with the acknum (acknowledgement number) indicating which packet the ACK is for. The receiver discards any packets where the sequence number is not equal to the expected sequence number. This prevents the receiver from receiving duplicate packets or out-of-order packets. RTP connections have send and receive buffers to hold packets that are waiting to be sent to the receiver or are ready to be sent from the receiver to the application layer.
@@ -54,12 +78,17 @@ I. How RTP works
             This stands for "end of message" and is a RTP header field. If eom=1, the packet is the last packet in a message so the receiver knows to return the message data to the application layer.
 
     H. Packet Losses
+        Lost packets are handled in Go-Back-N. If a packet is lost, it will not be ACKed by the receiver. This results in a timeout at the sender, causing the sender to re-send all packets in the sliding window starting after the most recently ACKed packet. So the lost packet will be re-sent.
 
     I. Re-ordered Packets
+        Re-ordered packets are handled with sequence numbers and acknowledgement numbers as described in the section about byte-stream semantics. If a packet is sent out of order, the receiver will discard it rather than ACK it because the sequence number is not the number expected. The sender will time out and re-send the packets in the sliding window.
 
     J. Corrupted Packets
+        A checksum is used to check for corrupted packets.
 
     K. Congestion Control
+
+    L. Bi-Directional Data Transfers
 
 II. RTP header structure and header fields
     The RTP header consists of the following fields:
@@ -75,7 +104,7 @@ II. RTP header structure and header fields
     | SYN         | integer  |  1   | 1 if SYN, 0 otherwise            |
     | FIN         | integer  |  1   | 1 if FIN, 0 otherwise            |
     | rwnd        | integer  |  2   | Receive window size              |
-    | checksum    | integer  |  2   | Checksum value                   |
+    | checksum    | integer  |  4   | Checksum value                   |
     | eom         | integer  |  1   | 1 if end of message, 0 otherwise |
     +=============+==========+======+==================================+
 
