@@ -465,7 +465,14 @@ class RTPSocket:
 		"""Closes the RTP socket and connection from the client side."""
 		# send FIN to server
 		addr = conn.dst_addr
-		self.sendFIN(self.socket_port, addr, 0, 0)
+
+		#with self.ackLock: #clear the ACK LIST
+		#	self.ackList[addr] = []
+
+		seq = random.randint(0,1000)
+		self.sendFIN(self.socket_port, addr, seq, 0)
+
+		print "sent FIN"
 
 		# wait for ACK from server
 		#self.setTimeout()
@@ -474,13 +481,14 @@ class RTPSocket:
 				if self.ackList[addr] != []:
 					with self.ackLock:
 						packet = self.ackList[addr].pop(0) #lock becuase we are modifying data
-
 					header = packet.header
-					break
+					if header.acknum == seq + 1:
+						break
 			except socket.error:
 				print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
 				return
 
+		print "got ACK"
 		# wait for FIN from server
 		#self.setTimeout()
 		while 1:
@@ -496,8 +504,10 @@ class RTPSocket:
 				print "Did not receive FIN - socket timed out."
 				return
 
+
+		acknum = header.seqnum + 1
 		# send another ACK to the server... -____-
-		self.sendACK(self.socket_port, addr, 0, 0) # using 0 as seqnum
+		self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
 
 		# wait a while to make sure the ACK gets received
 		time.sleep(2) # placeholder - should be 2 * MSL
@@ -521,13 +531,16 @@ class RTPSocket:
 				break
 
 		# send ACK
-		self.sendACK(self.socket_port, dstaddr, 0, 0)
+		acknum = header.seqnum + 1
+		self.sendACK(self.socket_port, dstaddr, 0, acknum)
 
 		# wait for app
 		# ???
 
 		# send FIN
-		self.sendFIN(self.socket_port, dstaddr, 0, 0)
+
+		seq = random.randint(0,1000)
+		self.sendFIN(self.socket_port, dstaddr, seq, 0)
 
 		# wait for ACK
 		#self.setTimeout()
@@ -536,7 +549,8 @@ class RTPSocket:
 				with self.ackLock:
 					packet = self.ackList[dstaddr].pop(0)
 				header = packet.header
-				break
+				if header.acknum == seq + 1:
+					break
 
 		# close connection
 		conn.isOff = True
