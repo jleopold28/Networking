@@ -66,6 +66,7 @@ class RTPSocket:
 		#self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_NO_CHECK, 1)
 
 		self.server_isn = None
+		self.close_seq = None
 		self.rwnd = None
 
 		self.SYNqueue = []
@@ -76,12 +77,16 @@ class RTPSocket:
 
 		self.ackList = {}
 		self.finList = {}
+
+		self.testList = {}
  
 		self.connLock = threading.Lock()
 		self.ackLock = threading.Lock()
 		self.finLock = threading.Lock()
 		self.synackLock = threading.Lock()
 		self.synLock = threading.Lock()
+		self.testLock = threading.Lock()
+
 
 		self.recvThread = threading.Thread(target = self.recv)
 		self.recvThread.daemon = True # so the thread will exit when the program exits
@@ -131,6 +136,8 @@ class RTPSocket:
 				self.ackList[conn_id] = []
 			with self.finLock:
 				self.finList[conn_id] = []
+			with self.testLock:
+				self.testList[conn_id] = []
 
 			while True:
 				if conn.isOff == False:
@@ -200,6 +207,8 @@ class RTPSocket:
 			self.ackList[conn_id] = []
 		with self.finLock:
 			self.finList[conn_id] = []
+		with self.testLock:
+			self.testList[conn_id] = []
 
 		conn.startConn()
 		#print "returning RTP connection at " + str(conn_id)
@@ -353,6 +362,11 @@ class RTPSocket:
 						self.connections[rcv_address].startConn()
 					self.server_isn = None
 					continue
+				elif self.close_seq != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.close_seq + 1) and header.checksum == rcvpkt.getChecksum():
+					with self.testLock:
+						self.testList[rcv_address].append(rcvpkt)
+					self.close_seq = None
+					continue
 				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #GOT ACK
 					with self.ackLock:
 						self.ackList[rcv_address].append(rcvpkt)
@@ -469,21 +483,21 @@ class RTPSocket:
 		#with self.ackLock: #clear the ACK LIST
 		#	self.ackList[addr] = []
 
-		seq = random.randint(0,1000)
-		self.sendFIN(self.socket_port, addr, seq, 0)
+		self.close_seq = random.randint(0,1000)
+		self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
-		print "sent FIN"
+		print "sent FIN to "
+		print addr
 
 		# wait for ACK from server
 		#self.setTimeout()
 		while 1:
 			try:
-				if self.ackList[addr] != []:
-					with self.ackLock:
-						packet = self.ackList[addr].pop(0) #lock becuase we are modifying data
+				if self.testList[addr] != []:
+					with self.testLock:
+						packet = self.testList[addr].pop(0) #lock becuase we are modifying data
 					header = packet.header
-					if header.acknum == seq + 1:
-						break
+					break
 			except socket.error:
 				print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
 				return
@@ -507,6 +521,8 @@ class RTPSocket:
 
 		acknum = header.seqnum + 1
 		# send another ACK to the server... -____-
+		print "seding final ACK to "
+		print addr
 		self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
 
 		# wait a while to make sure the ACK gets received
@@ -530,14 +546,22 @@ class RTPSocket:
 				header = finPacket.header
 				break
 
+		print "GOT FIN "
+		print dstaddr
+
 		# send ACK
 		acknum = header.seqnum + 1
 		self.sendACK(self.socket_port, dstaddr, 0, acknum)
+		print "SENT ACK to "
+		print dstaddr
 
 		# wait for app
 		# ???
 
 		# send FIN
+
+		print "SENDING FIN TO"
+		print dstaddr
 
 		seq = random.randint(0,1000)
 		self.sendFIN(self.socket_port, dstaddr, seq, 0)
@@ -545,13 +569,14 @@ class RTPSocket:
 		# wait for ACK
 		#self.setTimeout()
 		while 1:
-			if self.ackList[dstaddr] != []:
-				with self.ackLock:
-					packet = self.ackList[dstaddr].pop(0)
+			if self.testList[dstaddr] != []:
+				with self.testLock:
+					packet = self.testList[dstaddr].pop(0)
 				header = packet.header
-				if header.acknum == seq + 1:
-					break
+				break
 
+		print "GOT ACK, CLOSING CONNECTION"
+		print dstaddr
 		# close connection
 		conn.isOff = True
 		with self.connLock:
