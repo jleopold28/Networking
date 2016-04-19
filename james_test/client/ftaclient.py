@@ -17,7 +17,6 @@ def get_post(conn, file1, file2, addr):
 	with lock:
 		sock.send(command + ":" + file1 + ":" + file2, addr)
 
-
 	download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, addr))
 
@@ -117,7 +116,7 @@ def main(argv):
 		if command == "disconnect":
 			with lock:
 				sock.send("CLOSE CONNECTION", (host, port)) 
-			sock.clientClose(conn)
+				sock.clientClose(conn)
 			print "\n\n"
 			disconnect = True
 		elif "get-post" in command:

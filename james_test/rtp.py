@@ -297,7 +297,8 @@ class RTPSocket:
 				header = packet.header
 				self.base = header.acknum + 1
 				for i in range(0, self.base): #cumulative ACK
-					self.packetList[i].isACKED = True
+					if i < len(self.packetList):
+						self.packetList[i].isACKED = True
 				if(self.base == self.nextseqnum):
 					t.cancel()
 				else:
