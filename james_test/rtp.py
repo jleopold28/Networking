@@ -78,14 +78,14 @@ class RTPSocket:
 		self.ackList = {}
 		self.finList = {}
 
-		self.testList = {}
+		self.finackList = {}
  
 		self.connLock = threading.Lock()
 		self.ackLock = threading.Lock()
 		self.finLock = threading.Lock()
 		self.synackLock = threading.Lock()
 		self.synLock = threading.Lock()
-		self.testLock = threading.Lock()
+		self.finackLock = threading.Lock()
 
 
 		self.recvThread = threading.Thread(target = self.recv)
@@ -136,8 +136,8 @@ class RTPSocket:
 				self.ackList[conn_id] = []
 			with self.finLock:
 				self.finList[conn_id] = []
-			with self.testLock:
-				self.testList[conn_id] = []
+			with self.finackLock:
+				self.finackList[conn_id] = []
 
 			while True:
 				if conn.isOff == False:
@@ -207,8 +207,8 @@ class RTPSocket:
 			self.ackList[conn_id] = []
 		with self.finLock:
 			self.finList[conn_id] = []
-		with self.testLock:
-			self.testList[conn_id] = []
+		with self.finackLock:
+			self.finackList[conn_id] = []
 
 		conn.startConn()
 		#print "returning RTP connection at " + str(conn_id)
@@ -363,8 +363,8 @@ class RTPSocket:
 					self.server_isn = None
 					continue
 				elif self.close_seq != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.close_seq + 1) and header.checksum == rcvpkt.getChecksum():
-					with self.testLock:
-						self.testList[rcv_address].append(rcvpkt)
+					with self.finackLock:
+						self.finackList[rcv_address].append(rcvpkt)
 					self.close_seq = None
 					continue
 				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #GOT ACK
@@ -493,9 +493,9 @@ class RTPSocket:
 		#self.setTimeout()
 		while 1:
 			try:
-				if self.testList[addr] != []:
-					with self.testLock:
-						packet = self.testList[addr].pop(0) #lock becuase we are modifying data
+				if self.finackList[addr] != []:
+					with self.finackLock:
+						packet = self.finackList[addr].pop(0) #lock becuase we are modifying data
 					header = packet.header
 					break
 			except socket.error:
@@ -569,9 +569,9 @@ class RTPSocket:
 		# wait for ACK
 		#self.setTimeout()
 		while 1:
-			if self.testList[dstaddr] != []:
-				with self.testLock:
-					packet = self.testList[dstaddr].pop(0)
+			if self.finackList[dstaddr] != []:
+				with self.finackLock:
+					packet = self.finackList[dstaddr].pop(0)
 				header = packet.header
 				break
 
