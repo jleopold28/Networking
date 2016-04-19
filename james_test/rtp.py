@@ -563,8 +563,8 @@ class RTPSocket:
 		print "SENDING FIN TO"
 		print dstaddr
 
-		seq = random.randint(0,1000)
-		self.sendFIN(self.socket_port, dstaddr, seq, 0)
+		self.close_seq = random.randint(0,1000)
+		self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
 
 		# wait for ACK
 		#self.setTimeout()
