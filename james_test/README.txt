@@ -16,7 +16,28 @@ rtp.py          reliable transfer protocol source code
 Sample.txt      sample output file
 3251.jpg        image for file transfer application
 
-Instructions for compiling and running programs:
+----
+INSTRUCTIONS FOR COMPILING AND RUNNING PROGRAMS
+
+The applications may be run from the command line as follows:
+    FTA Server:   python ftaserver.py <port> <rwnd>
+    FTA Client:   python ftaserver.py <host>:<port> <rwnd>
+    RDBA Server:  python dbengineRTP.py <port>
+    RDBA Client:  python dbclientRTP.py <host>:<port> <gtid> <attrs>
+
+While running FTA use the following command line arguments:
+    get <filename>                      downloads a file from server
+    get-post <filename1> <filename2>    downloads file 1 and uploads file 2 to server simultaneously
+    disconnect                          closes connection with the server
+
+Notes:
+    All code is written in Python 2.7.
+    Attributes to request for RDBA client should consist of one or more of the following separated by spaces:
+        first_name
+        last_name
+        quality_points
+        gpa_hours
+        gpa
 
 ---
 DESIGN DOCUMENTATION
@@ -84,11 +105,19 @@ I. How RTP works
         Re-ordered packets are handled with sequence numbers and acknowledgement numbers as described in the section about byte-stream semantics. If a packet is sent out of order, the receiver will discard it rather than ACK it because the sequence number is not the number expected. The sender will time out and re-send the packets in the sliding window.
 
     J. Corrupted Packets
-        A checksum is used to check for corrupted packets.
+        A checksum is used to check for corrupted packets. The checksum for a packet is computed on a pseudo-header plus the packet data. The pseudo header consists of all the RTPHeader fields except len_data and checksum. It is computed by first concatenating the packet data and the packet header (as a byte string). The checksum is initialized to zero and padded at the end if its length is odd. Then the characters are looped through and added to the checksum which is then folded and inverted. The bit operations done in the checksum algorithm are the same as in TCP (source: http://www.binarytides.com/raw-socket-programming-in-python-linux/).
+
+        The RTPPacket class has a getChecksum method and a setChecksum method. getChecksum calculates and returns the checksum value of the RTPPacket. setChecksum actually calls getChecksum on the packet and sets its checksum header field equal to the value returned by getChecksum().
+
+        When a packet is created in the RTPSocket send function, its checksum field is set with setChecksum. In the recv function, the checksum is used to check for corrupted packets. When a packet is received, the checksum value from its header field is compared to the value calculated with getChecksum for the packet. If the calculated value does not match the header checksum, the packet is determined to be corrupt and it is discarded by the receiver. It will be re-sent when the sender times out.
 
     K. Congestion Control
+        Congestion control in RTP is similar to TCP congestion control but less complex. It is done at the connection level - each connection has its own congestion window. Loss events are indicated by timeouts (when the sender sends a packet but does not receive an ACK before the timer runs out). The sender will never send more data than the minimum of (rwnd, cwnd) for a connection to avoid overflowing the sender or receiver buffer. The receiver has a congestion window of self.cwnd bytes. This is the amount of data that is allowed to be sent at one time. Initially when a connection is created cwnd = 1 MSS. Another variable, self.ssthresh, is set to 25000 bytes (an arbitrarily large number). Cwnd is changed every time an ACK is received for a sent packet. While cwnd < ssthresh, cwnd is multiplied by 2 every time an ACK is received (slow start). When cwnd >= ssthresh, it is incremented only by 1 MSS with every ACK received. If cwnd ever exceeds rwnd, only rwnd number of packets will be sent even though the congestion window may be larger.
+
+        If a loss event (timeout) occurs in the send function, ssthresh is set to half the value of cwnd at the time the loss occurred. Cwnd is then set to 1 MSS and will begin slow start again. The idea is that the new ssthresh should more appropriately account for the current amount of network congestion than the last ssthresh and prevent the connection from transmitting too much data.
 
     L. Bi-Directional Data Transfers
+        Bi-directional data transfers are made possible through multithreading. In the example of the get-post function in the File Transfer Application, two threads are created, one for uploading (sending a file from client to server) and downloading (sending a file from server to client). Both threads are started one after the other and joined. The threads both use the same client and server RTPSockets for the bi-directional transfer, but they use different RTPConnections (demultiplexing as explained above). The program continues after both threads finish.
 
 II. RTP header structure and header fields
     The RTP header consists of the following fields:
@@ -111,8 +140,10 @@ II. RTP header structure and header fields
     The struct library is used to "pack" the header as a binary string. The data string is concatenated onto the header before the packet is sent. When a packet is received, it is "unpacked" to retrieve the data and header fields. The "Size" column is the size of the packed field in bytes, so the total size of the RTP header is 22 bytes. Network byte order is always used.
 
 III. Finite State Machine diagrams
+    EDIT
 
 IV. Programming interface
+    EDIT
     A. class RTPHeader
         Represents a header for an RTPPacket.
      
@@ -216,6 +247,7 @@ IV. Programming interface
 
 
 V. Algorithmic descriptions of non-trivial RTP functions
+    EDIT
     A. RTPConnection.accept(self, sock, socket_addr):
         This method is the server side of a 3-way handshake. It has no return value.
         - The self.socket_addr variable (host, port) for the socket passed in is set to the address passed in. 
@@ -229,3 +261,4 @@ V. Algorithmic descriptions of non-trivial RTP functions
 
 ---
 KNOWN BUGS AND LIMITATIONS
+    EDIT
