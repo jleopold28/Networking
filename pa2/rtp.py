@@ -46,8 +46,11 @@ class RTPConnection:
 		self.data += data
 
 	def startConn(self):
+	"""Starts the connection by setting self.connOn to True"""
 		self.connOn = True
+
 	def stopConn(self):
+	"""Stops the connection by setting self.connOn to False"""
 		self.connOn = False
 
 
@@ -332,6 +335,7 @@ class RTPSocket:
 			self.sock.sendto(packetToSend.makeBytes(), addr)
 
 	def getData(self, conn_id):
+		"""Returns the data from the connection with the id passed in."""
 		if conn_id in self.connections.keys():
 			with self.connLock:
 				return self.connections[conn_id].getData()
