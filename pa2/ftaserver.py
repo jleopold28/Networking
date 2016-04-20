@@ -3,8 +3,6 @@ import os
 import sys
 import time
 import threading
-import Queue
-sys.path.insert(0,'..')
 from rtp import *
 
 sock = None
@@ -91,7 +89,7 @@ def uploadFile(filename, addr):
 
 def downloadFile(conn, filename):
 	extensionList = filename.split(".")
-	ofile = open("post_G_" + extensionList[0] +"."+ extensionList[1], "wb") # open in write bytes mode
+	ofile = open("post_G."+ extensionList[1], "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
 		data = conn.getData()

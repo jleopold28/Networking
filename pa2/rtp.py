@@ -43,19 +43,6 @@ class RTPConnection:
 	def startConn(self):
 		self.isOff = False
 
-	def foo(self):
-		if len(self.ackList) == 0:
-			return False
-		else:
-			return True
-
-	def getACK(self):
-		a = self.ackList.pop(0) #remove the first element
-		return a
-
-	def addACK(self, p):
-		self.ackList.append(p)
-
 
 class RTPSocket:
 	"""Represents a socket over RTP"""

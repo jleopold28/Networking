@@ -2,9 +2,6 @@
 import os
 import sys
 import threading
-import Queue
-
-sys.path.insert(0,'..')
 from rtp import *
 
 sock = None
@@ -38,7 +35,7 @@ def get(conn, filename, addr):
 def downloadFile(conn, filename):
 	print "DOWNLOADING FILE"
 	fileList = filename.split(".")
-	ofile = open("get_F_" + fileList[0] + "." +fileList[1], "wb") # open in write bytes mode
+	ofile = open("get_F." +fileList[1], "wb") # open in write bytes mode
 
 	while 1:
 		data = conn.getData()
@@ -117,7 +114,7 @@ def main(argv):
 			with lock:
 				sock.send("CLOSE CONNECTION", (host, port)) 
 				sock.clientClose(conn)
-			print "\n\n"
+			print "\n"
 			disconnect = True
 		elif "get-post" in command:
 			# arguments should be F G
