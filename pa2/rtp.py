@@ -1,34 +1,38 @@
 """
-This module includes RTPSocket, RTPPacket, and RTPHeader classes.
+This module includes RTPConnection, RTPSocket, RTPPacket, and RTPHeader classes.
 """
+import math
 import random
 import socket
 import struct
+import sys
 import threading 
 import time
-import sys
-import math
 
 class RTPConnection:
 	"""Represents a connection over RTP"""
 	def __init__(self, destination_address):
-		"""Constructs a new RTPConnection."""
+		"""Constructs a new RTPConnection to the destination address passed in."""
 		self.dst_addr = destination_address
 		self.dst_host = destination_address[0]
 		self.dst_port = destination_address[1]
 		self.connOn = False
 
 		# Receiver window for flow control
-		self.rwnd = None # will be initialized in connect
-		self.init_rwnd = None
+		self.rwnd = None # will be initialized in connect - this is the variable rwnd size
+		self.init_rwnd = None # will be initialized later - this is the initial rwnd size
 
 		# Congestion control variables
-		self.cwnd = RTPPacket.MSS # initially set cwnd to 1 (this replaces self.N)
-		self.ssthresh = 25000  # 25KB  # this will be reset after first loss event, 128 packets!
+		self.cwnd = RTPPacket.MSS # initially set cwnd to 1 MSS
+		self.ssthresh = 25000  # 25KB, this will be reset after first loss event, 128 packets!
 
 		self.data = ""
 
 	def getData(self):
+		""" 
+		Returns the data from the receive buffer and resets the receive buffer.
+		If the receiver buffer (self.data) is empty, returns an empty string.
+		"""
 		if self.data:
 			out = self.data
 			self.data = ""
@@ -38,10 +42,16 @@ class RTPConnection:
 			return ""
 
 	def addData(self, data):
+		"""Adds the data passed in onto the receive buffer (self.data)."""
 		self.data += data
 
 	def startConn(self):
+<<<<<<< HEAD
 		self.connOn = True
+=======
+		"""Starts the connection by setting self.isOff to False."""
+		self.isOff = False
+>>>>>>> 357d2e81ad3a06b0c5e27c047f5fda270912535b
 
 
 class RTPSocket:
@@ -50,23 +60,24 @@ class RTPSocket:
 		"""Constructs a new RTPConnection."""
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		#self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_NO_CHECK, 1)
 
 		self.server_isn = None
 		self.close_seq = None
 		self.rwnd = None
 
+		# queues to hold SYNs, SYNACKS
 		self.SYNqueue = []
 		self.SYNACKqueue = []
-		self.FINqueue = []
 
+		# hash map to hold active connections
 		self.connections = {}
 
+		# hash maps to hold ACKs, FINs, FINACKs
 		self.ackList = {}
 		self.finList = {}
-
 		self.finackList = {}
- 
+
+ 		# locks to prevent variables from being modified by multiple threads at once
 		self.connLock = threading.Lock()
 		self.ackLock = threading.Lock()
 		self.finLock = threading.Lock()
@@ -74,13 +85,12 @@ class RTPSocket:
 		self.synLock = threading.Lock()
 		self.finackLock = threading.Lock()
 
-
+		# create recv thread but do not start
 		self.recvThread = threading.Thread(target = self.recv)
 		self.recvThread.daemon = True # so the thread will exit when the program exits
 
-		#self.sock.settimeout(2)
-
 	def bind(self, socket_addr):
+		"""Binds the RTPSocket to the address passed in and starts recv thread."""
 		self.socket_addr = socket_addr
 		self.socket_host = socket_addr[0]
 		self.socket_port = socket_addr[1]
@@ -89,8 +99,11 @@ class RTPSocket:
 		self.recvThread.start()
 
 	def accept(self):
-		"""Server side of 3 way handshake; accepts connection to client."""
-
+		"""
+		Server side of 3 way handshake; accepts connection to client.
+		Returns the RTPConnection and destination address as a tuple.
+		If no SYN bits are received, return a tuple of two empty strings.
+		"""
 		if len(self.SYNqueue) == 0: # no SYN bits recevied
 			return ("","")
 			#print "no SYN bits received"
@@ -107,11 +120,7 @@ class RTPSocket:
 			self.sendSYNACK(self.socket_port, dstaddr, self.server_isn, acknum)
 			#print "sent SYNACK to " + str(dstaddr)
 
-			# accept is server side so I think we need to create the connection object at the client address
-			# then in connect we already have the connection in self.connections and just need to set conn.isOff = False
-
-			conn_id = (dstaddr[0], dstaddr[1])
-			#conn_id = dstaddr[1] 				# now identify by the client port! #random.randint(0,100000)
+			conn_id = (dstaddr[0], dstaddr[1]) # identify connection by destination host and port
 			conn = RTPConnection(dstaddr)
 			conn.rwnd = self.rwnd # set rwnd for the connection
 			conn.init_rwnd = self.rwnd
@@ -137,8 +146,8 @@ class RTPSocket:
 
 	def connect(self, destination_address):
 		"""
-		Connects to the desired host and port
-		destination_address: tuple (host, port)
+		Connects to the destination address passed in.
+		Returns an RTPConnection.
 		"""
 		#client side 3 way handshake
 
@@ -242,9 +251,6 @@ class RTPSocket:
 		self.t = None
 		self.base = 0 
 		self.nextseqnum = 0
-		# keep congestion window smaller than receive window
-		#if self.connections[addr].cwnd > self.connections[addr].rwnd:
-		#	self.connections[addr].cwnd = self.connections[addr].rwnd
 
 		# set the number of packets that can be sent
 		while 1:
@@ -304,7 +310,7 @@ class RTPSocket:
 
 	def timeout(self, addr):
 		""" 
-		Retransmits packets from base to nextseqnum-1
+		Retransmits packets from base to nextseqnum.
 		addr: tuple (host, port)
 		"""
 		print "\nTIMEOUT\n"
@@ -332,7 +338,7 @@ class RTPSocket:
 			return ""
 
 	def recv(self):
-		"""Receives data at a socket and returns data, address."""
+		"""Receives data at a socket and places it in the appropriate buffer/hash map/queue."""
 
 		expectedseqnum = 0
 		last_acknum_sent = None
@@ -395,9 +401,8 @@ class RTPSocket:
 						self.sendACK(self.socket_port, rcv_address, seqnum, last_acknum_sent)
 
 
-
 	def sendSYN(self, srcport, dstaddr, seqnum):
-		"""Sends a SYN packet with srcport, dstport, seqnum to addr."""
+		"""Sends a SYN packet with srcport, seqnum to dstaddr."""
 		# make SYN packet
 		dstport = dstaddr[1]
 		acknum = 0
@@ -414,9 +419,8 @@ class RTPSocket:
 		#print "SND: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
-
 	def sendACK(self, srcport, dstaddr, seqnum, acknum):
-		"""Sends an ACK packet with scrport, dstport, seqnum, acknum to addr."""
+		"""Sends an ACK packet with scrport, seqnum, acknum to dstaddr."""
 		
 		# REMOVE THIS - here to simulate dropped ACKs ============
 		#rand = random.randint(0, 10)
@@ -438,9 +442,8 @@ class RTPSocket:
 		#print "SENT ACK: " + str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
-
 	def sendSYNACK(self, srcport, dstaddr, seqnum, acknum):
-		"""Sends a SYNACK packet with scrport, dstport, seqnum, acknum to addr"""
+		"""Sends a SYNACK packet with scrport, seqnum, acknum to dstaddr"""
 		# make SYNACK packet
 		dstport = dstaddr[1]
 		ACK = 1
@@ -458,9 +461,8 @@ class RTPSocket:
 		#print "SYNACK: "+ str(packet)
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
-
 	def sendFIN(self, srcport, dstaddr, seqnum, acknum):
-		"""Sends a FIN packet to (self.dsthost, self.dstport)"""
+		"""Sends a FIN packet with srcport, seqnum, acknum to dstaddr"""
 		# make FIN packet
 		dstport = dstaddr[1]
 		ACK = 0
@@ -478,8 +480,12 @@ class RTPSocket:
 		#print "Sending FIN Packet"
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
+<<<<<<< HEAD
 
 	def clientClose(self, conn_id):
+=======
+	def clientClose(self, conn):
+>>>>>>> 357d2e81ad3a06b0c5e27c047f5fda270912535b
 		"""Closes the RTP socket and connection from the client side."""
 		# send FIN to server
 
@@ -546,9 +552,14 @@ class RTPSocket:
 			
 			self.sock.close()
 
+<<<<<<< HEAD
 
 	def serverClose(self, conn_id):
 		"""Closes the RTP connection passed in."""
+=======
+	def serverClose(self, conn):
+		"""Closes the RTP connection passed in from the server side."""
+>>>>>>> 357d2e81ad3a06b0c5e27c047f5fda270912535b
 		# wait for FIN
 		#self.setTimeout()
 
@@ -604,7 +615,6 @@ class RTPSocket:
 			with self.connLock:
 				del self.connections[dstaddr]# remove conn from self.connections
 
-
 	def getPacket(self, bytes):
 		"""
 		Takes in a byte string and parses it into header and data.
@@ -620,11 +630,9 @@ class RTPSocket:
 		packet = RTPPacket(header, tup[11])
 		return packet
 
-
 	def __str__(self):
 		"""Returns a string representation of an RTPSocket."""
 		return "Socket at Port " + str(self.socket_host) + ":" + str(self.socket_port) + " is sending to " + str(self.dst_host) + ":" + str(self.dst_port) + "  ID = " + str(self.cid) + "\n"
-
 
 	def setTimeout(self):
 		"""Sets socket timeout to 2 seconds."""
@@ -635,7 +643,7 @@ class RTPPacket:
 	"""
 	Represents an RTP packet.
 	MSS: maximum segment size in bytes
-	RTT: round trip time in seconds
+	RTT: seconds until timer times out
 	"""
 
 	MSS = 512   # FIXED PACKET SIZE 512 bytes
@@ -663,12 +671,11 @@ class RTPPacket:
 		packed_header = self.header.makeHeader(len_data)
 		return packed_header + self.data # bytes + string
 
-
-	# http://www.binarytides.com/raw-socket-programming-in-python-linux/
-	# http://locklessinc.com/articles/tcp_checksum/
 	def getChecksum(self):
-		"""Returns the checksum of a packet"""
-		# TODO exclude checksum from the checksum calculation!
+		"""
+		Returns the checksum (int) calculated for pseudo header and data of a packet.
+		See: http://www.binarytides.com/raw-socket-programming-in-python-linux/
+		"""
 		pkt = self.header.makePseudoHeader() + self.data
 
 		# calculate checksum on header + data
@@ -684,11 +691,9 @@ class RTPPacket:
 		csum = csum + (csum >> 16)
 		csum = ~csum & 0xFFFF
 		return int(csum)
-		
-
 
 	def setChecksum(self):
-		"""Sets the checksum field in the RTPPacket header"""
+		"""Sets the checksum field in the RTPPacket header to the value calculated in self.getChecksum()"""
 		csum = self.getChecksum()
 		self.header.checksum = csum
 
@@ -717,11 +722,9 @@ class RTPHeader:
 			", seqnum: " + str(self.seqnum) + ", acknum=" + str(self.acknum) + ", ACK=" + str(self.ACK) + ", SYN="
 			+ str(self.SYN) + ", FIN=" + str(self.FIN) + ", rwnd=" + str(self.rwnd) + ", checksum=" + str(self.checksum) + ", eom=" + str(self.eom))
 
-
 	def makeHeader(self, len_data = 0):
 		"""Packs header fields and returns a byte string."""
 		return struct.pack('!HHHLLBBBHLB', len_data, self.source_port, self.dest_port, self.seqnum, self.acknum, self.ACK, self.SYN, self.FIN, self.rwnd, self.checksum, self.eom)
-
 
 	def makePseudoHeader(self):
 		"""Packs certain header fields into pseudo header to be used in checksum calculation."""
