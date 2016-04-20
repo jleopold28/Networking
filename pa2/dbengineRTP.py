@@ -7,13 +7,13 @@ from rtp import *
 sock = None
 db = {}
 
-def clientSession(conn,addr):
+def clientSession(conn_id,addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
 	while 1:
-		data = conn.getData()
+		data = sock.getData(conn_id)
 		if data:
 			if data == "CLOSE CONNECTION":
-				sock.serverClose(conn)
+				sock.serverClose(conn_id)
 				print "CLOSEING SESSION FOR " + str(addr) + "\n"
 				break
 			elif data:
@@ -84,9 +84,9 @@ def main(argv):
 		sock.bind((server_host, server_port))
 		while 1:
 			#check the SYN QUE in ACCEPT
-			conn, addr = sock.accept()
-			if (conn, addr) != ( "","" ):
-				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
+			conn_id, addr = sock.accept()
+			if (conn_id, addr) != ( "","" ):
+				newthread = threading.Thread(target = clientSession, args = (conn_id, addr,))
 				newthread.start()
 
 		#TERMINATION

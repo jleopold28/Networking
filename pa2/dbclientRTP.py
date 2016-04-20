@@ -31,7 +31,7 @@ def main(argv):
 		sock = RTPSocket()
 		sock.rwnd = 512
 
-		conn = sock.connect((server_host, server_port))
+		conn_id = sock.connect((server_host, server_port))
 		
 		#DATA TRANSFER
 		sock.send(query + ":" + cols, (server_host, server_port))
@@ -42,7 +42,7 @@ def main(argv):
 			try:
 				print "Waiting for a response..."
 				#receive the data from the server
-				data = conn.getData()
+				data = sock.getData(conn_id)
 				if data:
 					print "Received response from server"
 					# if we get a response, stop the loop
@@ -61,7 +61,7 @@ def main(argv):
 		print data
 		#close the socket
 		sock.send("CLOSE CONNECTION", (server_host, server_port))
-		sock.clientClose(conn)
+		sock.clientClose(conn_id)
 		
 	except Exception, e:
 		#if there is an error, print error message
