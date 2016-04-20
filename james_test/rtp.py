@@ -468,7 +468,7 @@ class RTPSocket:
 		eom = 1
 
 		header = RTPHeader(srcport, dstport, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
-		packet = RTPPacket(header, "CLOSE CONNECTION")
+		packet = RTPPacket(header, "")
 		packet.setChecksum()
 	
 		#print packet
@@ -487,8 +487,8 @@ class RTPSocket:
 		self.close_seq = random.randint(0,1000)
 		self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
-		print "sent FIN to "
-		print addr
+		#print "sent FIN to "
+		#print addr
 
 		# wait for ACK from server
 		#self.setTimeout()
@@ -507,7 +507,7 @@ class RTPSocket:
 			#	print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
 			#	return
 
-		print "got ACK"
+		#print "got ACK"
 		# wait for FIN from server
 		#self.setTimeout()
 		while 1:
@@ -526,8 +526,8 @@ class RTPSocket:
 
 		acknum = header.seqnum + 1
 		# send another ACK to the server... -____-
-		print "seding final ACK to "
-		print addr
+		#print "seding final ACK to "
+		#print addr
 		self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
 
 		# wait a while to make sure the ACK gets received
@@ -551,22 +551,22 @@ class RTPSocket:
 				header = finPacket.header
 				break
 
-		print "GOT FIN "
-		print dstaddr
+		#print "GOT FIN "
+		#print dstaddr
 
 		# send ACK
 		acknum = header.seqnum + 1
 		self.sendACK(self.socket_port, dstaddr, 0, acknum)
-		print "SENT ACK to "
-		print dstaddr
+		#print "SENT ACK to "
+		#print dstaddr
 
 		# wait for app
 		# ???
 
 		# send FIN
 
-		print "SENDING FIN TO"
-		print dstaddr
+		#print "SENDING FIN TO"
+		#print dstaddr
 
 		self.close_seq = random.randint(0,1000)
 		self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
@@ -582,8 +582,8 @@ class RTPSocket:
 			time.sleep(2)
 			self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
 
-		print "GOT ACK, CLOSING CONNECTION"
-		print dstaddr
+		#print "GOT ACK, CLOSING CONNECTION"
+		#print dstaddr
 		# close connection
 		conn.isOff = True
 		with self.connLock:
