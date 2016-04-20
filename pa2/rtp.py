@@ -309,6 +309,9 @@ class RTPSocket:
 		addr: tuple (host, port)
 		"""
 		print "\nTIMEOUT\n"
+		print self.base
+		print self.nextseqnum
+
 		if self.t != None:
 			self.t.cancel()
 
@@ -504,7 +507,7 @@ class RTPSocket:
 					header = packet.header
 					break
 				
-				time.sleep(2)
+				time.sleep(1)
 				print "RESENDING FIN"
 				self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
@@ -536,7 +539,7 @@ class RTPSocket:
 			self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
 
 			# wait a while to make sure the ACK gets received
-			time.sleep(2) # placeholder - should be 2 * MSL
+			time.sleep(1) # placeholder - should be 2 * MSL
 
 			# finally close the connection
 			
@@ -588,7 +591,7 @@ class RTPSocket:
 						packet = self.finackList[dstaddr].pop(0)
 					header = packet.header
 					break
-				time.sleep(2)
+				time.sleep(1)
 				print "RESENDING FIN"
 				self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
 
