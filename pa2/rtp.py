@@ -46,12 +46,7 @@ class RTPConnection:
 		self.data += data
 
 	def startConn(self):
-<<<<<<< HEAD
 		self.connOn = True
-=======
-		"""Starts the connection by setting self.isOff to False."""
-		self.isOff = False
->>>>>>> 357d2e81ad3a06b0c5e27c047f5fda270912535b
 
 
 class RTPSocket:
@@ -480,12 +475,7 @@ class RTPSocket:
 		#print "Sending FIN Packet"
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
-<<<<<<< HEAD
-
 	def clientClose(self, conn_id):
-=======
-	def clientClose(self, conn):
->>>>>>> 357d2e81ad3a06b0c5e27c047f5fda270912535b
 		"""Closes the RTP socket and connection from the client side."""
 		# send FIN to server
 
@@ -552,14 +542,8 @@ class RTPSocket:
 			
 			self.sock.close()
 
-<<<<<<< HEAD
-
 	def serverClose(self, conn_id):
-		"""Closes the RTP connection passed in."""
-=======
-	def serverClose(self, conn):
 		"""Closes the RTP connection passed in from the server side."""
->>>>>>> 357d2e81ad3a06b0c5e27c047f5fda270912535b
 		# wait for FIN
 		#self.setTimeout()
 
