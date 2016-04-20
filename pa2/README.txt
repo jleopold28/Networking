@@ -147,10 +147,26 @@ III. Finite State Machine diagrams
     See fsm_sender.png and fsm_receiver.png
 
 IV. Programming interface
-    EDIT
-    A. class RTPHeader
+    A. class RTPConnection
+        Represents a connection over RTP
+ 
+        Methods defined here:
+        __init__(self, destination_address)
+        Constructs a new RTPConnection to the destination address passed in.
+
+        addData(self, data)
+        Adds the data passed in onto the receive buffer (self.data).
+
+        getData(self)
+        Returns the data from the receive buffer and resets the receive buffer.
+        If the receiver buffer (self.data) is empty, returns an empty string.
+
+        startConn(self)
+        Starts the connection by setting self.isOff to False.
+
+    B. class RTPHeader
         Represents a header for an RTPPacket.
-     
+ 
         Methods defined here:
         __init__(self, source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom)
         Constructs a new RTPHeader with the fields passed in.
@@ -160,11 +176,14 @@ IV. Programming interface
         
         makeHeader(self, len_data=0)
         Packs header fields and returns a byte string.
+        
+        makePseudoHeader(self)
+        Packs certain header fields into pseudo header to be used in checksum calculation.
 
-    B. class RTPPacket
+    C. class RTPPacket
         Represents an RTP packet.
         MSS: maximum segment size in bytes
-        RTT: round trip time in seconds
+        RTT: seconds until timer times out
          
         Methods defined here:
         __init__(self, header, data='')
@@ -173,82 +192,80 @@ IV. Programming interface
         __str__(self)
         Returns a string representation of an RTPPacket.
         
-        isACK(self)
-        Returns True if packet is an ACK, False otherwise.
-        
-        isFIN(self)
-        Returns True if packet is a FIN, False otherwise.
-        
-        isSYN(self)
-        Returns True if packet is a SYN, False otherwise.
+        getChecksum(self)
+        Returns the checksum (int) calculated for pseudo header and data of a packet.
+        See: http://www.binarytides.com/raw-socket-programming-in-python-linux/
         
         makeBytes(self)
         Returns the RTPPacket as a byte string.
         len_data (int) will be used when client/server receives a packet so the length of the data is known.
         See: http://docs.python.org/2/library/struct.html
         
+        setChecksum(self)
+        Sets the checksum field in the RTPPacket header to the value calculated in getChecksum()
+        
         Data and other attributes defined here:
-        MSS = 1
+        MSS = 512
         RTT = 2
 
-    C. class RTPSocket
-        Represents a socket using RTP.
+    D. class RTPSocket
+        Represents a socket over RTP
  
         Methods defined here:
         __init__(self)
-        Constructs a new RTPSocket.
+        Constructs a new RTPConnection.
         
         __str__(self)
         Returns a string representation of an RTPSocket.
         
         accept(self)
         Server side of 3 way handshake; accepts connection to client.
+        Returns the RTPConnection and destination address as a tuple.
+        If no SYN bits are received, return a tuple of two empty strings.
         
-        bind(self, source_address)
-        Binds the socket with the desired host and port.
-        source_address: tuple (host, port)
+        bind(self, socket_addr)
+        Binds the RTPSocket to the address passed in and starts recv thread.
         
-        clientClose(self)
-        Closes the RTP connection from the client side.
+        clientClose(self, conn)
+        Closes the RTP socket and connection from the client side.
         
         connect(self, destination_address)
-        Connects to the desired host and port
-        destination_address: tuple (host, port)
+        Connects to the destination address passed in.
+        Returns an RTPConnection.
         
         getPacket(self, bytes)
         Takes in a byte string and parses it into header and data.
         Returns an RTPPacket.
         
         recv(self)
-        Receives data at a socket and returns data, address.
+        Receives data at a socket and places it in the appropriate buffer/hash map/queue.
         
         send(self, data, addr)
         Sends data through a socket to an address
         data: data to send to address
         address: tuple (host, port)
         
-        sendACK(self, srcport, dstport, seqnum, acknum, addr)
-        Sends an ACK packet with scrport, dstport, seqnum, acknum to addr.
+        sendACK(self, srcport, dstaddr, seqnum, acknum)
+        Sends an ACK packet with scrport, seqnum, acknum to dstaddr.
         
-        sendFIN(self)
-        Sends a FIN packet to (self.dsthost, self.dstport)
+        sendFIN(self, srcport, dstaddr, seqnum, acknum)
+        Sends a FIN packet with srcport, seqnum, acknum to dstaddr
         
-        sendSYN(self, srcport, dstport, seqnum, addr)
-        Sends a SYN packet with srcport, dstport, seqnum to addr.
+        sendSYN(self, srcport, dstaddr, seqnum)
+        Sends a SYN packet with srcport, seqnum to dstaddr.
         
-        sendSYNACK(self, srcport, dstport, seqnum, acknum, addr)
-        Sends a SYNACK packet with scrport, dstport, seqnum, acknum to addr
+        sendSYNACK(self, srcport, dstaddr, seqnum, acknum)
+        Sends a SYNACK packet with scrport, seqnum, acknum to dstaddr
         
-        serverClose(self)
-        Closes the RTP connection from the server side.
+        serverClose(self, conn)
+        Closes the RTP connection passed in from the server side.
         
         setTimeout(self)
         Sets socket timeout to 2 seconds.
         
         timeout(self, addr)
-        Retransmits packets from base to nextseqnum-1
+        Retransmits packets from base to nextseqnum.
         addr: tuple (host, port)
-
 
 V. Algorithmic descriptions of non-trivial RTP functions
     EDIT
