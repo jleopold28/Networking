@@ -13,7 +13,9 @@ def clientSession(conn_id, addr):
 
 	while 1:
 		#data = conn.getData()
-		data = sock.getData(conn_id)
+		with lock:
+			data = sock.getData(conn_id)
+
 		if data:
 			if data == "CLOSE CONNECTION":
 				sock.serverClose(conn_id)
@@ -93,7 +95,9 @@ def downloadFile(conn_id, filename):
 	while 1:
 		# receive response from server
 		#data = conn.getData()
-		data = sock.getData(conn_id)
+		with lock:
+			data = sock.getData(conn_id)
+			
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove("post_G." + extensionList[1])
