@@ -366,7 +366,7 @@ class RTPSocket:
 				elif self.close_seq != None and header.ACK == 1 and header.SYN == 0 and header.acknum == (self.close_seq + 1) and header.checksum == rcvpkt.getChecksum():
 					with self.finackLock:
 						self.finackList[rcv_address].append(rcvpkt)
-					self.close_seq = None
+					#self.close_seq = None
 					continue
 				elif rcvpkt and header.ACK == 1 and header.checksum == rcvpkt.getChecksum(): #GOT ACK
 					with self.ackLock:
@@ -493,31 +493,35 @@ class RTPSocket:
 		# wait for ACK from server
 		#self.setTimeout()
 		while 1:
-			try:
-				if self.finackList[addr] != []:
-					with self.finackLock:
-						packet = self.finackList[addr].pop(0) #lock becuase we are modifying data
-					header = packet.header
-					break
-			except socket.error:
-				print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
-				return
+			#try:
+			if self.finackList[addr] != []:
+				with self.finackLock:
+					packet = self.finackList[addr].pop(0) #lock becuase we are modifying data
+				header = packet.header
+				break
+
+			time.sleep(2)
+			self.sendFIN(self.socket_port, addr, self.close_seq, 0)
+
+			#except socket.error:
+			#	print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
+			#	return
 
 		print "got ACK"
 		# wait for FIN from server
 		#self.setTimeout()
 		while 1:
-			try:
+			#try:
 				# wait for FIN bit and pop from FIN queue]
-				if self.finList[addr] != []:
-					with self.finLock:
-						finPacket = self.finList[addr].pop(0) # get first FIN but do not remove from queue
-					header = finPacket.header
-					break
+			if self.finList[addr] != []:
+				with self.finLock:
+					finPacket = self.finList[addr].pop(0) # get first FIN but do not remove from queue
+				header = finPacket.header
+				break
 
-			except socket.error:
-				print "Did not receive FIN - socket timed out."
-				return
+			#except socket.error:
+			#	print "Did not receive FIN - socket timed out."
+			#	return
 
 
 		acknum = header.seqnum + 1
@@ -575,6 +579,8 @@ class RTPSocket:
 					packet = self.finackList[dstaddr].pop(0)
 				header = packet.header
 				break
+			time.sleep(2)
+			self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
 
 		print "GOT ACK, CLOSING CONNECTION"
 		print dstaddr

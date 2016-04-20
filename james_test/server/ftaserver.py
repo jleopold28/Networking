@@ -139,11 +139,12 @@ def main(argv):
 				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
 				newthread.start()
 
+
 		#sock.close()
 	except Exception, e:
 		print "Error"
 		print e
-		raise # for debugging
+		#raise # for debugging
 		#sys.exit(1) # uncomment if we want the server to shut down on error
 		
  
