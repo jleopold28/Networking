@@ -7,14 +7,16 @@ Kate Unsworth   kunsworth@gatech.edu
 ---
 FILES SUBMITTED
 
-dbclientRTP.py  relational database client
-dbengineRTP.py  relational database server
-ftaclient.py    file transfer application client
-ftaserver.py    file transfer application server
-README.txt      readme
-rtp.py          reliable transfer protocol source code
-Sample.txt      sample output file
-3251.jpg        image for file transfer application
+dbclientRTP.py      relational database client
+dbengineRTP.py      relational database server
+fsm_receiver.py     FSM diagram for RTP receiver
+fsm_sender.py       FSM diagram for RTP sender
+ftaclient.py        file transfer application client
+ftaserver.py        file transfer application server
+README.txt          readme
+rtp.py              reliable transfer protocol source code
+Sample.txt          sample output file
+3251.jpg            image for file transfer application
 
 ----
 INSTRUCTIONS FOR COMPILING AND RUNNING PROGRAMS
@@ -98,6 +100,8 @@ I. How RTP works
         2. eom: 
             This stands for "end of message" and is a RTP header field. If eom=1, the packet is the last packet in a message so the receiver knows to return the message data to the application layer.
 
+        Other special values/parameters are described throughout this design documentation.
+
     H. Packet Losses
         Lost packets are handled in Go-Back-N. If a packet is lost, it will not be ACKed by the receiver. This results in a timeout at the sender, causing the sender to re-send all packets in the sliding window starting after the most recently ACKed packet. So the lost packet will be re-sent.
 
@@ -140,7 +144,7 @@ II. RTP header structure and header fields
     The struct library is used to "pack" the header as a binary string. The data string is concatenated onto the header before the packet is sent. When a packet is received, it is "unpacked" to retrieve the data and header fields. The "Size" column is the size of the packed field in bytes, so the total size of the RTP header is 22 bytes. Network byte order is always used.
 
 III. Finite State Machine diagrams
-    EDIT
+    See fsm_sender.png and fsm_receiver.png
 
 IV. Programming interface
     EDIT
@@ -248,17 +252,54 @@ IV. Programming interface
 
 V. Algorithmic descriptions of non-trivial RTP functions
     EDIT
-    A. RTPConnection.accept(self, sock, socket_addr):
-        This method is the server side of a 3-way handshake. It has no return value.
-        - The self.socket_addr variable (host, port) for the socket passed in is set to the address passed in. 
-        - The connection "listens" for a SYN from the client. If a SYN is received, a connection with the client that sent the SYN is set up. 
-        - A server_isn is randomly generated
-        - The server sends a SYNACK to the client with seqnum=server_isn.
-        - The server waits to receive a response from the client. The function ends if the ACK with the expected seqnum and acknum is received from the expected client.
-    B. RTPConnection.connect(self, sock, destination_address):
-        This method is on the client side of a 3-way handshake. It connects to the destionation_address passed in and has no return value.
-        - The self. [more later]
+    A. RTPConnection functions
+        1. __init__(self, destination_address): constructs a new RTPConnection. Sets destination host and port. Initializes variables used for flow control and congestion control.
+
+        2. getData(self): returns data from the receive buffer and resets the receive buffer.
+
+        3. addData(self, data): adds data to the receive buffer.
+
+        4. startConn(self): sets isOff to False so the connection is "on."
+
+    B. RTPSocket functions
+        1. __init__(self): constructs a new RTPSocket. Initializes queues, hash maps, and UDP socket. Creates (but does not start) a daemon thread that continuously calls recv.
+
+        2. bind(self, socket_addr): binds the RTPSocket to the host and port passed in. Sets self.socket_host and self.socket_port. Starts receiving thread.
+
+        3. accept(self): waits to receive a SYN, then accepts a connection to a client and sends a SYNACK. Returns a new RTPConnection.
+
+        4. connect(self, destination_address): connects to the server at the destination address passed in by sending a SYN. Starts the receiving thread for the client side. When the SYNACK is received, sends an ACK back and creates a new RTPConnection and adds it to self.connections. Starts the RTPConnection and then returns it.
+
+        5. send(self, data, addr): the data passed in is broken into segments of size MSS bytes which are made into packets and placed in a packetList. The base and nextseqnum are set to 0. The send window size self.N is set to the floor of the minimum of the receive window of the connection to send to and the congestion window of the sender. The packets in the cwnd are all sent and a timer is started. The sender then waits for a cumulative ACK. When the ACK is received, the packets up to the acknum - 1 are marked as isACKED = True. 
+
+        6. timeout(self, addr): If a timer in the send function times out, the packets in the send window starting with base are re-sent.
+
+        7. recv(self): this function is called continuously inside a receive thread. Whenever a response is received from recvfrom, the packet is examined to see if it is a SYN, SYNACK, ACK, FIN, FINACK, or data packet and whether it is corrupt (checked by calculating checksum). The packet is placed in the appropriate queue/hash map if it is not a data packet. Otherwise, if the sequence number is equal to the expected sequence number the data is added to the receive buffer of the receiving connection. The receive window size for that connection is adjusted, and an ACK is sent to the sender. If the sequence number is not equal to the expected sequence number, the ACK for the last properly received packet is re-sent.
+
+        8. clientClose(self, conn): closes the connection passed in on the client side. Sends a FIN to the server, then receives a FINACK. If the FINACK is not received, the FIN is re-sent until a FINACK is received. Then another FIN is received from the server. Sends a final ACK and waits 2 seconds to make sure the ACK gets received, then closes the UDP socket.
+
+        9. serverClose(self, conn): closes the conenction on the server side. Waits to receive a FIN, then sends an ACK to the client, followed by a FIN with sequence number self.close_seq. After the client receives that FIN and sends a FINACK, the server receives the FINACK and sends one more FIN to the client. The connection.isOff is set to True for the connection passed in, and that connection is also removed from self.connections.
+
+        10. getPacket(self, bytes): takes in a byte string and parses it into header and data, then returns an RTPPacket with the header and data.
+
+    C. RTPPacket functions
+        1. __init__(self, header, data): constructs a new RTPPacket with the header (RTPHeader object) and data (string) passed in. Initializes self.isACKED to False.
+
+        2. makeBytes(self): packs the packet and header into a byte string and returns the byte string.
+
+        3. getChecksum(self): calculates a checksum on the packet pseudoheader and data, and returns the calculated checksum.
+
+        4. setChecksum(self): sets the checksum field in the RTPPacket header to the value of self.getChecksum().
+
+    D. RTPHeader functions
+        1. __init__(self, source_port, dest_port, seqnum, acknum, ACK, SYN, FIN, rwnd, checksum, eom): constructs an RTPHeader and sets header fields.
+
+        2. makeHeader(self, len_data): packs header fields into a byte string and returns the byte string.
+
+        3. makePseudoHeader(self): packs most header fields (except checksum) into a byte string and returns the byte string.
 
 ---
 KNOWN BUGS AND LIMITATIONS
-    EDIT
+
+Unable to perform get-post function from FTA from two different clients simultaneously.
+
