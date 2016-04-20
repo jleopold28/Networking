@@ -46,11 +46,11 @@ class RTPConnection:
 		self.data += data
 
 	def startConn(self):
-	"""Starts the connection by setting self.connOn to True"""
+		"""Starts the connection by setting self.connOn to True"""
 		self.connOn = True
 
 	def stopConn(self):
-	"""Stops the connection by setting self.connOn to False"""
+		"""Stops the connection by setting self.connOn to False"""
 		self.connOn = False
 
 
