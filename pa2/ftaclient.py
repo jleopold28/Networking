@@ -7,14 +7,14 @@ from rtp import *
 sock = None
 lock = threading.Lock()
 
-def get_post(conn, file1, file2, addr):
+def get_post(conn_id, file1, file2, addr):
 	"""Downloads file1 from server and uploads file2 to server through same RTP connection."""
 	command = "GET-POST"
 	
 	with lock:
 		sock.send(command + ":" + file1 + ":" + file2, addr)
 
-	download_thread = threading.Thread(target = downloadFile, args = (conn, file1))
+	download_thread = threading.Thread(target = downloadFile, args = (conn_id, file1))
 	upload_thread = threading.Thread(target = uploadFile, args = (file2, addr))
 
 	download_thread.start()
@@ -23,22 +23,24 @@ def get_post(conn, file1, file2, addr):
 	download_thread.join()
 	upload_thread.join()
 
-def get(conn, filename, addr):
+def get(conn_id, filename, addr):
 	"""Downloads file from server."""
 	with lock:
 		sock.send("GET:" + filename, addr) #tell the server what operation we are doing
 	#get_thread = threading.Thread(target = downloadFile, args = (conn, filename))
 	#get_thread.start()
 	#get_thread.join()
-	downloadFile(conn,filename)
+	downloadFile(conn_id,filename)
 
-def downloadFile(conn, filename):
+def downloadFile(conn_id, filename):
 	print "DOWNLOADING FILE"
 	fileList = filename.split(".")
 	ofile = open("get_F." +fileList[1], "wb") # open in write bytes mode
 
 	while 1:
-		data = conn.getData()
+		#data = conn.getData()
+		data = sock.getData(conn_id)
+
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove("get_F." + fileList[1])#os.remove(filename)
@@ -106,14 +108,13 @@ def main(argv):
 	sock = RTPSocket()
 	sock.rwnd = rwnd
 
-	conn = sock.connect((host,port))
+	conn_id = sock.connect((host,port))
 
 	while disconnect == False:
 		command = raw_input("> ")
 		if command == "disconnect":
-			with lock:
-				sock.send("CLOSE CONNECTION", (host, port)) 
-				sock.clientClose(conn)
+			sock.send("CLOSE CONNECTION", (host, port)) 
+			sock.clientClose(conn_id)
 			print "\n"
 			disconnect = True
 		elif "get-post" in command:
@@ -133,7 +134,7 @@ def main(argv):
 				print "Invalid filename: " + g
 				continue
 			try:
-				get_post(conn, f, g, (host, port))
+				get_post(conn_id, f, g, (host, port))
 			except Exception,e:
 				print e
 				print "Error downloading or uploading file."
@@ -151,7 +152,7 @@ def main(argv):
 				print "Invalid filename: " + f
 				continue
 			try:
-				get(conn, f, (host,port))
+				get(conn_id, f, (host,port))
 			except:
 				print "Error downloading file."
 				raise # for debugging

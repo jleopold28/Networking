@@ -8,15 +8,15 @@ from rtp import *
 sock = None
 lock = threading.Lock()
 
-def clientSession(conn, addr):
+def clientSession(conn_id, addr):
 	print "STARTING CLIENT SESSION at " + str(addr)
 
 	while 1:
-		data = conn.getData()
+		#data = conn.getData()
+		data = sock.getData(conn_id)
 		if data:
 			if data == "CLOSE CONNECTION":
-				with lock:
-					sock.serverClose(conn)
+				sock.serverClose(conn_id)
 				print "CLOSING SESSION FOR " + str(addr) + "\n"
 				return
 			#determine which command we are doing and whith what filename
@@ -28,18 +28,18 @@ def clientSession(conn, addr):
 			elif command == "GET-POST":
 				file1 = dataList[1]
 				file2 = dataList[2]
-				get_post(conn, addr, file1, file2)
+				get_post(conn_id, addr, file1, file2)
 			else:
 				error_msg = "INVALID COMMAND"
 				with lock:
 					sock.send(error_msg, addr)
 	return
 
-def get_post(conn, addr, file1, file2):
+def get_post(conn_id, addr, file1, file2):
 	"""Downloads file1 from cient and uploads file2 to client in same RTP connection."""
 
 	upload_thread = threading.Thread(target = uploadFile, args = (file1, addr))
-	download_thread = threading.Thread(target = downloadFile, args = (conn, file2))
+	download_thread = threading.Thread(target = downloadFile, args = (conn_id, file2))
 
 	upload_thread.start()
 	download_thread.start()
@@ -87,12 +87,13 @@ def uploadFile(filename, addr):
 
 	return
 
-def downloadFile(conn, filename):
+def downloadFile(conn_id, filename):
 	extensionList = filename.split(".")
 	ofile = open("post_G."+ extensionList[1], "wb") # open in write bytes mode
 	while 1:
 		# receive response from server
-		data = conn.getData()
+		#data = conn.getData()
+		data = sock.getData(conn_id)
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
 			os.remove("post_G." + extensionList[1])
@@ -132,9 +133,9 @@ def main(argv):
 		sock.bind((host, port))
 		while 1:
 			#check the SYN QUE in ACCEPT
-			conn, addr = sock.accept()
-			if (conn, addr) != ( "","" ):
-				newthread = threading.Thread(target = clientSession, args = (conn, addr,))
+			conn_id, addr = sock.accept()
+			if (conn_id, addr) != ( "","" ):
+				newthread = threading.Thread(target = clientSession, args = (conn_id, addr,))
 				newthread.start()
 
 

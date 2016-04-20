@@ -16,7 +16,7 @@ class RTPConnection:
 		self.dst_addr = destination_address
 		self.dst_host = destination_address[0]
 		self.dst_port = destination_address[1]
-		self.isOff = True
+		self.connOn = False
 
 		# Receiver window for flow control
 		self.rwnd = None # will be initialized in connect
@@ -41,7 +41,7 @@ class RTPConnection:
 		self.data += data
 
 	def startConn(self):
-		self.isOff = False
+		self.connOn = True
 
 
 class RTPSocket:
@@ -127,12 +127,12 @@ class RTPSocket:
 				self.finackList[conn_id] = []
 
 			while True:
-				if conn.isOff == False:
+				if conn.connOn == True: #wait for the connection to turn on
 					break
 			
 			#print "CONNECTION IS ON"
 			#print "Socket address:" + str(self.socket_addr)
-			return conn, dstaddr
+			return conn_id, dstaddr
 
 
 	def connect(self, destination_address):
@@ -189,6 +189,7 @@ class RTPSocket:
 
 		with self.connLock:		
 			self.connections[conn_id] = conn
+			conn.startConn()
 
 		with self.ackLock:
 			self.ackList[conn_id] = []
@@ -197,9 +198,8 @@ class RTPSocket:
 		with self.finackLock:
 			self.finackList[conn_id] = []
 
-		conn.startConn()
 		#print "returning RTP connection at " + str(conn_id)
-		return conn
+		return conn_id
 
 
 	def send(self, data, addr):
@@ -239,7 +239,7 @@ class RTPSocket:
 			self.packetList.append(packet)
 			seqnum = seqnum + 1
 
-		t = None
+		self.t = None
 		self.base = 0 
 		self.nextseqnum = 0
 		# keep congestion window smaller than receive window
@@ -256,14 +256,14 @@ class RTPSocket:
 				#raw_input("press to send")
 				self.sock.sendto(packetToSend.makeBytes(), addr)
 				if(self.base == self.nextseqnum):
-					if t != None: #is there is a timer running, stop it
-						t.cancel()
-					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-					t.start()
+					if self.t != None: #is there is a timer running, stop it
+						self.t.cancel()
+					self.t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+					self.t.start()
 				self.nextseqnum += 1
 				self.N = math.floor(min(self.connections[addr].rwnd, self.connections[addr].cwnd) / RTPPacket.MSS)
 
-			if self.ackList[addr] != []:
+			if len(self.ackList[addr])!= 0:
 				with self.ackLock: #lock becuase we are removing data
 					packet = self.ackList[addr].pop(0)
 
@@ -286,17 +286,18 @@ class RTPSocket:
 				for i in range(0, self.base): #cumulative ACK
 					if i < len(self.packetList):
 						self.packetList[i].isACKED = True
+
 				if(self.base == self.nextseqnum):
-					t.cancel()
+					self.t.cancel()
 				else:
-					if t != None:
-						t.cancel()
-					t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-					t.start()
+					if self.t != None:
+						self.t.cancel()
+					self.t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+					self.t.start()
 
 			if self.packetList[-1].isACKED == True:
-				if t != None:
-					t.cancel()
+				if self.t != None:
+					self.t.cancel()
 				break
 
 		#print "FINISHED SENDING MESSAGE"
@@ -307,18 +308,28 @@ class RTPSocket:
 		addr: tuple (host, port)
 		"""
 		print "\nTIMEOUT\n"
+		if self.t != None:
+			self.t.cancel()
+
 		# loss event occurred, so reset ssthresh and cwnd
 
 		with self.connLock:
 			self.connections[addr].ssthresh = self.connections[addr].cwnd / 2 # set to 1/2 initial value of cwnd
 			self.connections[addr].cwnd = RTPPacket.MSS
 
-		t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
-		t.start()
+		self.t = threading.Timer(RTPPacket.RTT, self.timeout, [addr])
+		self.t.start()
 
 		for i in range(self.base, self.nextseqnum): #range doesnt include last value so take out the minus 1
 			packetToSend = self.packetList[i]
 			self.sock.sendto(packetToSend.makeBytes(), addr)
+
+	def getData(self, conn_id):
+		if conn_id in self.connections.keys():
+			with self.connLock:
+				return self.connections[conn_id].getData()
+		else:
+			return ""
 
 	def recv(self):
 		"""Receives data at a socket and returns data, address."""
@@ -378,6 +389,11 @@ class RTPSocket:
 						if last_acknum_sent != None:
 							seqnum = rcvpkt.header.acknum
 							self.sendACK(self.socket_port, rcv_address, seqnum, last_acknum_sent)
+				else: #none of the above so resend
+					if last_acknum_sent != None:
+						seqnum = rcvpkt.header.acknum
+						self.sendACK(self.socket_port, rcv_address, seqnum, last_acknum_sent)
+
 
 
 	def sendSYN(self, srcport, dstaddr, seqnum):
@@ -463,118 +479,130 @@ class RTPSocket:
 		self.sock.sendto(packet.makeBytes(), dstaddr)
 
 
-	def clientClose(self, conn):
+	def clientClose(self, conn_id):
 		"""Closes the RTP socket and connection from the client side."""
 		# send FIN to server
-		addr = conn.dst_addr
 
-		#with self.ackLock: #clear the ACK LIST
-		#	self.ackList[addr] = []
+		if conn_id in self.connections.keys():
+			with self.connLock:
+				conn = self.connections[conn_id]
 
-		self.close_seq = random.randint(0,1000)
-		self.sendFIN(self.socket_port, addr, self.close_seq, 0)
+			addr = conn.dst_addr
 
-		#print "sent FIN to "
-		#print addr
+			#with self.ackLock: #clear the ACK LIST
+			#	self.ackList[addr] = []
 
-		# wait for ACK from server
-		#self.setTimeout()
-		while 1:
-			#try:
-			if self.finackList[addr] != []:
-				with self.finackLock:
-					packet = self.finackList[addr].pop(0) #lock becuase we are modifying data
-				header = packet.header
-				break
-
-			time.sleep(2)
+			self.close_seq = random.randint(0,1000)
 			self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
-			#except socket.error:
-			#	print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
-			#	return
+			print "sent FIN to "
+			#print addr
 
-		#print "got ACK"
-		# wait for FIN from server
-		#self.setTimeout()
-		while 1:
-			#try:
-				# wait for FIN bit and pop from FIN queue]
-			if self.finList[addr] != []:
-				with self.finLock:
-					finPacket = self.finList[addr].pop(0) # get first FIN but do not remove from queue
-				header = finPacket.header
-				break
+			# wait for ACK from server
+			#self.setTimeout()
+			while 1:
+				#try:
+				if self.finackList[addr] != []:
+					with self.finackLock:
+						packet = self.finackList[addr].pop(0) #lock becuase we are modifying data
+					header = packet.header
+					break
+				
+				time.sleep(2)
+				print "RESENDING FIN"
+				self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
-			#except socket.error:
-			#	print "Did not receive FIN - socket timed out."
-			#	return
+				#except socket.error:
+				#	print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
+				#	return
+
+			print "got ACK"
+			# wait for FIN from server
+			#self.setTimeout()
+			while 1:
+				#try:
+					# wait for FIN bit and pop from FIN queue]
+				if self.finList[addr] != []:
+					with self.finLock:
+						finPacket = self.finList[addr].pop(0) # get first FIN but do not remove from queue
+					header = finPacket.header
+					break
+
+				#except socket.error:
+				#	print "Did not receive FIN - socket timed out."
+				#	return
 
 
-		acknum = header.seqnum + 1
-		# send another ACK to the server... -____-
-		#print "seding final ACK to "
-		#print addr
-		self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
+			acknum = header.seqnum + 1
+			# send another ACK to the server... -____-
+			print "seding final ACK"
+			#print addr
+			self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
 
-		# wait a while to make sure the ACK gets received
-		time.sleep(2) # placeholder - should be 2 * MSL
+			# wait a while to make sure the ACK gets received
+			time.sleep(2) # placeholder - should be 2 * MSL
 
-		# finally close the connection
-		
-		self.sock.close()
+			# finally close the connection
+			
+			self.sock.close()
 
 
-	def serverClose(self, conn):
+	def serverClose(self, conn_id):
 		"""Closes the RTP connection passed in."""
 		# wait for FIN
 		#self.setTimeout()
-		dstaddr = conn.dst_addr
 
-		while 1:
-			if self.finList[dstaddr] != []:
-				with self.finLock:
-					finPacket = self.finList[dstaddr].pop(0)
-				header = finPacket.header
-				break
+		if conn_id in self.connections.keys():
+			with self.connLock:
+				conn = self.connections[conn_id]
 
-		#print "GOT FIN "
-		#print dstaddr
+			dstaddr = conn.dst_addr
 
-		# send ACK
-		acknum = header.seqnum + 1
-		self.sendACK(self.socket_port, dstaddr, 0, acknum)
-		#print "SENT ACK to "
-		#print dstaddr
+			while 1:
+				if self.finList[dstaddr] != []:
+					with self.finLock:
+						finPacket = self.finList[dstaddr].pop(0)
+					header = finPacket.header
+					break
 
-		# wait for app
-		# ???
+			print "GOT FIN "
+			#print dstaddr
 
-		# send FIN
+			# send ACK
+			acknum = header.seqnum + 1
+			self.sendACK(self.socket_port, dstaddr, 0, acknum)
+			print "SENT ACK to "
+			#print dstaddr
 
-		#print "SENDING FIN TO"
-		#print dstaddr
+			# wait for app
+			# ???
 
-		self.close_seq = random.randint(0,1000)
-		self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
+			# send FIN
 
-		# wait for ACK
-		#self.setTimeout()
-		while 1:
-			if self.finackList[dstaddr] != []:
-				with self.finackLock:
-					packet = self.finackList[dstaddr].pop(0)
-				header = packet.header
-				break
-			time.sleep(2)
+			print "SENDING FIN TO"
+			#print dstaddr
+
+			self.close_seq = random.randint(0,1000)
 			self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
 
-		#print "GOT ACK, CLOSING CONNECTION"
-		#print dstaddr
-		# close connection
-		conn.isOff = True
-		with self.connLock:
-			del self.connections[dstaddr]# remove conn from self.connections
+			# wait for ACK
+			#self.setTimeout()
+			while 1:
+				if self.finackList[dstaddr] != []:
+					with self.finackLock:
+						packet = self.finackList[dstaddr].pop(0)
+					header = packet.header
+					break
+				time.sleep(2)
+				print "RESENDING FIN"
+				self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
+
+			print "GOT ACK, CLOSING CONNECTION"
+			#print dstaddr
+			# close connection
+			conn.connOn = False
+			with self.connLock:
+				del self.connections[dstaddr]# remove conn from self.connections
 
 
 	def getPacket(self, bytes):
