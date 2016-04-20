@@ -1,0 +1,21 @@
+SERVER TERMINAL:
+
+$ python ftaserver.py 5656 512
+STARTING CLIENT SESSION at ('127.0.0.1', 44800)
+Sent file to client
+CLOSING SESSION FOR ('127.0.0.1', 44800)
+
+
+
+
+
+
+
+CLIENT TERMINAL:
+
+$ python ftaclient.py 127.0.0.1:5656 512
+> get 3251.jpg
+DOWNLOADING FILE
+FINSHED DOWNLOADING
+
+> disconnect
