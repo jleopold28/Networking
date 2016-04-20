@@ -124,7 +124,7 @@ def main(argv):
 	try:
 		port = int(argv[0])
 		rwnd = int(argv[1])
-		host = '127.0.0.1'
+		host = '0.0.0.0'
 	except:
 		print "Invalid command line argument(s).\npython ftaserver.py $PORT $RWND"
 		sys.exit(1)
