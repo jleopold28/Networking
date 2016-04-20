@@ -95,7 +95,7 @@ def downloadFile(conn, filename):
 		data = conn.getData()
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
-			os.remove(filename)
+			os.remove("post_G." + extensionList[1])
 			print data
 			break
 		elif data == "EOF":

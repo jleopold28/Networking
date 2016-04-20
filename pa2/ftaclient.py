@@ -41,7 +41,7 @@ def downloadFile(conn, filename):
 		data = conn.getData()
 		if data == "ERROR: FILE NOT FOUND":
 			ofile.close()
-			os.remove("get_F_" + fileList[0] + "." + fileList[1])#os.remove(filename)
+			os.remove("get_F." + fileList[1])#os.remove(filename)
 			print data
 			break
 		elif data == "EOF":
