@@ -47,6 +47,8 @@ class RTPConnection:
 
 	def startConn(self):
 		self.connOn = True
+	def stopConn(self):
+		self.connOn = False
 
 
 class RTPSocket:
@@ -55,6 +57,7 @@ class RTPSocket:
 		"""Constructs a new RTPConnection."""
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		#self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_NO_CHECK, 1)
 
 		self.server_isn = None
 		self.close_seq = None
@@ -277,10 +280,10 @@ class RTPSocket:
 						cwnd = self.connections[addr].cwnd
 						self.connections[addr].cwnd = cwnd + RTPPacket.MSS*(RTPPacket.MSS/cwnd)
 
-				print "Received ACK"
-				print "cwnd: " + str(self.connections[addr].cwnd)
-				print "rwnd: " + str(self.connections[addr].rwnd)
-				print "N: " + str(self.N)
+				#print "Received ACK"
+				#print "cwnd: " + str(self.connections[addr].cwnd)
+				#print "rwnd: " + str(self.connections[addr].rwnd)
+				#print "N: " + str(self.N)
 
 				header = packet.header
 				self.base = header.acknum + 1
@@ -309,8 +312,8 @@ class RTPSocket:
 		addr: tuple (host, port)
 		"""
 		print "\nTIMEOUT\n"
-		print self.base
-		print self.nextseqnum
+		#print self.base
+		#print self.nextseqnum
 
 		if self.t != None:
 			self.t.cancel()
@@ -483,10 +486,7 @@ class RTPSocket:
 		# send FIN to server
 
 		if conn_id in self.connections.keys():
-			with self.connLock:
-				conn = self.connections[conn_id]
-
-			addr = conn.dst_addr
+			addr = self.connections[conn_id].dst_addr
 
 			#with self.ackLock: #clear the ACK LIST
 			#	self.ackList[addr] = []
@@ -494,7 +494,7 @@ class RTPSocket:
 			self.close_seq = random.randint(0,1000)
 			self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
-			print "sent FIN to "
+			#print "sent FIN to "
 			#print addr
 
 			# wait for ACK from server
@@ -508,14 +508,14 @@ class RTPSocket:
 					break
 				
 				time.sleep(1)
-				print "RESENDING FIN"
+				#print "RESENDING FIN"
 				self.sendFIN(self.socket_port, addr, self.close_seq, 0)
 
 				#except socket.error:
 				#	print "Did not receive ACK packet - socket timed out." # keep waiting I guess? for now
 				#	return
 
-			print "got ACK"
+			#print "got ACK"
 			# wait for FIN from server
 			#self.setTimeout()
 			while 1:
@@ -534,15 +534,14 @@ class RTPSocket:
 
 			acknum = header.seqnum + 1
 			# send another ACK to the server... -____-
-			print "seding final ACK"
+			#print "seding final ACK"
 			#print addr
 			self.sendACK(self.socket_port, addr, 0, acknum) # using 0 as seqnum
 
 			# wait a while to make sure the ACK gets received
-			time.sleep(1) # placeholder - should be 2 * MSL
+			time.sleep(2) # placeholder - should be 2 * MSL
 
 			# finally close the connection
-			
 			self.sock.close()
 
 	def serverClose(self, conn_id):
@@ -551,10 +550,7 @@ class RTPSocket:
 		#self.setTimeout()
 
 		if conn_id in self.connections.keys():
-			with self.connLock:
-				conn = self.connections[conn_id]
-
-			dstaddr = conn.dst_addr
+			dstaddr = self.connections[conn_id].dst_addr
 
 			while 1:
 				if self.finList[dstaddr] != []:
@@ -563,13 +559,13 @@ class RTPSocket:
 					header = finPacket.header
 					break
 
-			print "GOT FIN "
+			#print "GOT FIN "
 			#print dstaddr
 
 			# send ACK
 			acknum = header.seqnum + 1
 			self.sendACK(self.socket_port, dstaddr, 0, acknum)
-			print "SENT ACK to "
+			#print "SENT ACK to "
 			#print dstaddr
 
 			# wait for app
@@ -577,7 +573,7 @@ class RTPSocket:
 
 			# send FIN
 
-			print "SENDING FIN TO"
+			#print "SENDING FIN TO"
 			#print dstaddr
 
 			self.close_seq = random.randint(0,1000)
@@ -592,14 +588,14 @@ class RTPSocket:
 					header = packet.header
 					break
 				time.sleep(1)
-				print "RESENDING FIN"
+				#print "RESENDING FIN"
 				self.sendFIN(self.socket_port, dstaddr, self.close_seq, 0)
 
-			print "GOT ACK, CLOSING CONNECTION"
+			#print "GOT ACK, CLOSING CONNECTION"
 			#print dstaddr
 			# close connection
-			conn.connOn = False
 			with self.connLock:
+				self.connections[dstaddr].stopConn()
 				del self.connections[dstaddr]# remove conn from self.connections
 
 	def getPacket(self, bytes):
